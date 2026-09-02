@@ -1,0 +1,47 @@
+Experiment: noun-only SAM3 text prompts
+Commit: 9f59fe4e0e19fac0571f728bf82d17ad175be8a3
+Direct comparison: role-specific descriptive prompts at 8b0925fa1c3c1310ab37ad52d2ea727065773fc5
+Outcome count: 0 fully successful, 2 partially successful, and 9 unsuccessful.
+
+Automated result
+----------------
+All entity, SAM3, split-state, split-action, render, and validation stages completed for all 11 scenes. DA3 artifacts were reused unchanged and trajectories were not assessed. The only intended change was replacing role-specific descriptive SAM3 prompts with one common noun per entity.
+
+Visual assessment by scene
+--------------------------
+9 ASU table top / episode 103
+The can remains tracked, but initial support and target both resolve to the same generic table mask. The action output remains empty and the final state is ambiguous, so this is not an improvement.
+
+11 UTokyo xArm pick and place / episode 12
+Regression. Both manipulated object and target use the prompt "plate" and produce byte-identical masks. The pipeline can no longer distinguish the moved white plate from the destination red plate.
+
+15 DLR SARA grid clamp / episode 100
+Regression. The generic "clamp" prompt returns no manipulated-object track, while the descriptive baseline at least detected the row of clamps. The target track is also absent and the graph remains empty.
+
+17 DLR SARA pour / episode 55
+The generic "cup" track is visible for all frames, but visual inspection shows that it follows the stationary vessel rather than reliably isolating the manipulated source cup. The initial-support track is lost, so the apparent coverage increase is not a grounding improvement.
+
+18 DLR EDAN shared control / episode 21
+Partially usable. The ball is detected only in seven frames, compared with all 30 using "yellow ball". The visible lift can still be described, but the source goal still supplies an incorrect shelf target.
+
+19 UCSD pick and place / episode 1267
+Partially usable. The cylinder remains visible around the grasp, but coverage falls from 14 to 11 frames and support/target masks remain absent. The visible incomplete held outcome is still recognizable.
+
+28 VIOLA / episode 0
+Regression. Bowl visibility drops from 30 to 18 frames and the final graph remains visually incorrect because the bowl finishes beside, not on, the plate.
+
+49 Bridge / episode 10144
+Major regression. The generic prompt loses the manipulated potato completely. Although the table and bowl are broadly segmented, the final inside relation is no longer grounded by a manipulated-object mask.
+
+57 FMB / episode 141
+Regression. Cylinder coverage decreases, the support is lost, the target slot remains missing, and the graph is not usable.
+
+60 PLEX RoboSuite / episode 109
+Regression. Manipulated object and target both use "cube" and produce byte-identical masks, so the red moved cube and green destination cube cannot be distinguished.
+
+62 RoboSet / episode 10976
+The generic prompt removes the previously wrong laptop target, but it still fails to detect the banana and now has no usable target track. This is still unsuccessful.
+
+Conclusion
+----------
+Noun-only text prompting is substantially worse than role-specific descriptive prompting. It removes the visual attributes needed to distinguish same-category instances and loses several small or low-resolution objects. Do not retain this variant. Proceed to Qwen-generated geometric grounding boxes while restoring visually specific entity descriptions.
