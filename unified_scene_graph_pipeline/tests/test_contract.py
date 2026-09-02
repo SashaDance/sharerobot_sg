@@ -15,6 +15,8 @@ from common import ensure_no_confidence, image_paths  # noqa: E402
 from prepare import prepare  # noqa: E402
 from qwen import (  # noqa: E402
     contextual_chunks,
+    entity_reflection_prompt,
+    tracking_overlay_frame,
     validate_action_document,
     validate_entity_document,
     validate_state_document,
@@ -105,6 +107,32 @@ def test_context_chunks_never_exceed_thirty_images() -> None:
     assert [index for current, _ in chunks for index in current] == list(range(117))
     assert all(len(current) + (previous is not None) <= 30 for current, previous in chunks)
     assert all(previous == current[0] - 1 for current, previous in chunks[1:])
+
+
+def test_entity_reflection_uses_all_roles_without_confidence(tmp_path: Path) -> None:
+    frame = tmp_path / "frame.png"
+    Image.new("RGB", (100, 80), (30, 40, 50)).save(frame)
+    roles = {
+        "robot": {"canonical_name": "robot arm", "sam_prompt": "robot arm"},
+        "manipulated_object": {"canonical_name": "blue cube", "sam_prompt": "blue cube"},
+        "initial_support": None,
+        "target": None,
+        "whole_parent": None,
+    }
+    grounding = {
+        "robot": [{"frame_index": 0, "bbox_xyxy_1000": [0, 0, 500, 500]}],
+        "manipulated_object": [{"frame_index": 0, "bbox_xyxy_1000": [500, 500, 900, 900]}],
+        "initial_support": None,
+        "target": None,
+        "whole_parent": None,
+    }
+    rendered = tracking_overlay_frame(frame, roles, grounding, 0)
+    assert rendered.startswith(b"\x89PNG")
+    prompt = entity_reflection_prompt(
+        "move the blue cube", {"roles": roles, "task_actions": ["move"]}, [0],
+    )
+    assert "complete visible trajectory" in prompt
+    assert set(roles) == {"robot", "manipulated_object", "initial_support", "target", "whole_parent"}
 
 
 def test_qwen_box_chunks_preserve_all_frames_and_null_gaps() -> None:

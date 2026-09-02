@@ -45,6 +45,10 @@ def data_url(path: Path) -> str:
     return "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
 
 
+def png_data_url(payload: bytes) -> str:
+    return "data:image/png;base64," + base64.b64encode(payload).decode("ascii")
+
+
 def extract_object(text: str) -> dict[str, Any]:
     cleaned = re.sub(r"```(?:json)?", "", text, flags=re.I).replace("```", "")
     decoder = json.JSONDecoder()
@@ -223,6 +227,129 @@ def entity_content(goal: str, frames: Path, indices: list[int]) -> list[dict[str
     return content
 
 
+def entity_reflection_prompt(
+    goal: str,
+    proposal: dict[str, Any],
+    frame_indices: list[int],
+) -> str:
+    legend = {
+        role: {"marker": MASK_MARKERS[role], "color": MASK_COLORS[role][1]}
+        for role in ROLE_NAMES
+    }
+    return f"""You are the reflection stage of a zero-shot robot-video grounding system.
+Planning goal: {goal}
+Initial proposal: {json.dumps(proposal, ensure_ascii=False)}
+The following images are all ordered frames {frame_indices}. They show the initial proposal as colored boxes with this legend: {json.dumps(legend)}.
+
+Audit the proposal against the complete visible trajectory, then return a corrected entity proposal. Check that the manipulated object is the single physical instance whose pose or state changes because of the robot; do not select a nearby distractor, tool fixture, repeated row, or object mentioned by the goal but contradicted by the video. Check initial support in early frames and target at the observed destination in late frames. A target may be null when no destination interaction is visible. For repeated instances, use a short visual description that distinguishes the interacted instance. Preserve a role only when its identity is consistent across the sequence.
+
+Return exactly the same JSON shape as the initial proposal:
+{{"roles":{{
+ "robot":{{"canonical_name":"specific visible name","sam_prompt":"robot arm"}},
+ "manipulated_object":{{"canonical_name":"specific visible name","sam_prompt":"short discriminative visual description"}},
+ "initial_support":null or {{"canonical_name":"...","sam_prompt":"..."}},
+ "target":null or {{"canonical_name":"...","sam_prompt":"..."}},
+ "whole_parent":null or {{"canonical_name":"...","sam_prompt":"..."}}
+}},"task_actions":["canonical action labels"]}}
+Allowed actions: reach_for, grab, lift, move, place, release, push, pour, open, close, insert, stack.
+Do not output boxes, points, masks, confidence, reasoning, feedback, planning steps, aliases, or extra keys."""
+
+
+def tracking_overlay_frame(
+    frame_path: Path,
+    roles: dict[str, Any],
+    frame_grounding: dict[str, list[dict[str, Any]] | None],
+    frame_index: int,
+    coordinate_scale: int = 1000,
+) -> bytes:
+    from io import BytesIO
+    from PIL import Image, ImageDraw
+
+    image = Image.open(frame_path).convert("RGB")
+    draw = ImageDraw.Draw(image)
+    width, height = image.size
+    for role in ROLE_NAMES:
+        rows = frame_grounding.get(role)
+        if roles.get(role) is None or rows is None:
+            continue
+        row = rows[frame_index]
+        box = row.get("bbox_xyxy_1000")
+        if box is None:
+            continue
+        x1 = round(box[0] * width / coordinate_scale)
+        y1 = round(box[1] * height / coordinate_scale)
+        x2 = round(box[2] * width / coordinate_scale)
+        y2 = round(box[3] * height / coordinate_scale)
+        color = MASK_COLORS[role][0]
+        draw.rectangle((x1, y1, x2, y2), outline=color, width=max(2, min(width, height) // 160))
+        marker = MASK_MARKERS[role]
+        label_box = draw.textbbox((x1, y1), marker)
+        draw.rectangle(label_box, fill=(0, 0, 0))
+        draw.text((x1, y1), marker, fill=color)
+    stream = BytesIO()
+    image.save(stream, format="PNG")
+    return stream.getvalue()
+
+
+def entity_reflection_content(
+    goal: str,
+    output: Path,
+    proposal: dict[str, Any],
+    frame_grounding: dict[str, list[dict[str, Any]] | None],
+    indices: list[int],
+) -> list[dict[str, Any]]:
+    content: list[dict[str, Any]] = [{
+        "type": "text",
+        "text": entity_reflection_prompt(goal, proposal, indices),
+    }]
+    for index in indices:
+        overlay = tracking_overlay_frame(
+            output / "frames" / f"frame_{index:06d}.png",
+            proposal["roles"],
+            frame_grounding,
+            index,
+        )
+        content.extend([
+            {"type": "text", "text": f"frame {index}"},
+            {"type": "image_url", "image_url": {"url": png_data_url(overlay)}},
+        ])
+    return content
+
+
+def ground_roles_in_chunks(
+    client: QwenClient,
+    goal: str,
+    roles: dict[str, Any],
+    output: Path,
+    indices: list[int],
+    tracking_chunk_size: int,
+    max_tokens: int,
+) -> tuple[dict[str, list[dict[str, Any]] | None], list[dict[str, Any]]]:
+    frame_grounding: dict[str, list[dict[str, Any]] | None] = {
+        role: ([] if roles[role] is not None else None) for role in ROLE_NAMES
+    }
+    audit = []
+    for start in range(0, len(indices), tracking_chunk_size):
+        current = indices[start : start + tracking_chunk_size]
+        prompt = tracking_prompt(goal, roles, current)
+        content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
+        for index in current:
+            content.extend([
+                {"type": "text", "text": f"frame {index}"},
+                {"type": "image_url", "image_url": {"url": data_url(output / "frames" / f"frame_{index:06d}.png")}},
+            ])
+        chunk_tracks, attempts = client.request(
+            content,
+            max_tokens,
+            lambda value, requested=current: validate_tracking_document(value, requested, roles),
+        )
+        for role in ROLE_NAMES:
+            if frame_grounding[role] is not None:
+                frame_grounding[role].extend(chunk_tracks[role] or [])
+        audit.append({"frames": current, "attempts": attempts})
+    return frame_grounding, audit
+
+
 def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False) -> dict[str, Any]:
     target = output / "task_spec.json"
     fingerprint = stage_fingerprint(config, [output / "input.json"], "entities")
@@ -256,33 +383,59 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
             validate_entity_document,
         )
         audit_attempts.append({"stage": "reconcile", "attempts": attempts})
-    frame_grounding: dict[str, list[dict[str, Any]] | None] = {
-        role: ([] if merged["roles"][role] is not None else None) for role in ROLE_NAMES
-    }
-    tracking_audit = []
     tracking_chunk_size = int(config["qwen"]["tracking_frames_per_request"])
     if not 1 <= tracking_chunk_size <= int(config["qwen"]["frames_per_request"]):
         raise ValueError("tracking_frames_per_request must be between 1 and frames_per_request")
-    for start in range(0, len(indices), tracking_chunk_size):
-        current = indices[start : start + tracking_chunk_size]
-        prompt = tracking_prompt(context["planning_goal"], merged["roles"], current)
-        content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
-        for index in current:
-            content.extend([
-                {"type": "text", "text": f"frame {index}"},
-                {"type": "image_url", "image_url": {"url": data_url(output / "frames" / f"frame_{index:06d}.png")}},
-            ])
-        chunk_tracks, attempts = client.request(
-            content,
+    frame_grounding, tracking_audit = ground_roles_in_chunks(
+        client,
+        context["planning_goal"],
+        merged["roles"],
+        output,
+        indices,
+        tracking_chunk_size,
+        int(config["qwen"]["max_tokens_tracking"]),
+    )
+    initial_proposal = json.loads(json.dumps(merged))
+    initial_frame_grounding = json.loads(json.dumps(frame_grounding))
+    reflection_audit = []
+    initial_tracking_audit = tracking_audit
+    if bool(config["qwen"].get("entity_reflection_enabled", False)):
+        reflected_documents = []
+        for current, previous in contextual_chunks(indices, int(config["qwen"]["frames_per_request"])):
+            visual_indices = ([previous] if previous is not None else []) + current
+            reflected, attempts = client.request(
+                entity_reflection_content(
+                    context["planning_goal"], output, merged, frame_grounding, visual_indices,
+                ),
+                int(config["qwen"].get("max_tokens_entity_reflection", config["qwen"]["max_tokens_entities"])),
+                validate_entity_document,
+            )
+            reflected_documents.append(reflected)
+            reflection_audit.append({"frames": visual_indices, "attempts": attempts})
+        if len(reflected_documents) == 1:
+            merged = reflected_documents[0]
+        else:
+            reconciliation = [{"type": "text", "text": (
+                "Reconcile these reflection-stage entity proposals into the exact roles/task_actions JSON schema. "
+                "Use stable identities supported across the whole video and do not add extra fields. Planning goal: "
+                + context["planning_goal"] + "\nCandidates:\n"
+                + json.dumps(reflected_documents, ensure_ascii=False)
+            )}]
+            merged, attempts = client.request(
+                reconciliation,
+                int(config["qwen"].get("max_tokens_entity_reflection", config["qwen"]["max_tokens_entities"])),
+                validate_entity_document,
+            )
+            reflection_audit.append({"stage": "reconcile", "attempts": attempts})
+        frame_grounding, tracking_audit = ground_roles_in_chunks(
+            client,
+            context["planning_goal"],
+            merged["roles"],
+            output,
+            indices,
+            tracking_chunk_size,
             int(config["qwen"]["max_tokens_tracking"]),
-            lambda value, requested=current: validate_tracking_document(
-                value, requested, merged["roles"],
-            ),
         )
-        for role in ROLE_NAMES:
-            if frame_grounding[role] is not None:
-                frame_grounding[role].extend(chunk_tracks[role] or [])
-        tracking_audit.append({"frames": current, "attempts": attempts})
     entities = []
     role_map = {}
     kinds = {
@@ -311,6 +464,8 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
             "model_revision": config["qwen"]["revision"],
             "prompt_version": config["qwen"]["entity_prompt_version"],
             "tracking_prompt_version": config["qwen"]["tracking_prompt_version"],
+            "entity_reflection_enabled": bool(config["qwen"].get("entity_reflection_enabled", False)),
+            "entity_reflection_prompt_version": config["qwen"].get("entity_reflection_prompt_version"),
             "config_hash": config_hash(config),
             "all_frames_used": True,
             "all_frames_tracked": True,
@@ -320,6 +475,13 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
     write_json_atomic(output / "qwen_entities_audit.json", {
         "prompt_template": entity_prompt(context["planning_goal"], ["<ordered_frame_indices>"]),
         "chunks": audit_attempts,
+        "initial_proposal": initial_proposal,
+        "initial_frame_grounding": initial_frame_grounding,
+        "initial_tracking_chunks": initial_tracking_audit,
+        "reflection_prompt_template": entity_reflection_prompt(
+            context["planning_goal"], initial_proposal, ["<ordered_frame_indices>"],
+        ),
+        "reflection_chunks": reflection_audit,
         "tracking_prompt_template": tracking_prompt(
             context["planning_goal"], merged["roles"], ["<ordered_frame_indices>"],
         ),

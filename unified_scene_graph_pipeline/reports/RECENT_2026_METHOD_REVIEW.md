@@ -1,0 +1,29 @@
+# Recent 2026 methods relevant to the unified pipeline
+
+Reviewed 2026-09-02. The purpose of this note is to separate methods that can be tested faithfully from ideas that can only be adapted to our 30-frame, fixed-role robot-manipulation setting.
+
+## Tracking and grounding
+
+| Work | Main idea | Released implementation | Applicability here |
+|---|---|---|---|
+| [Refer-Agent (CVPR 2026)](https://arxiv.org/abs/2602.03595) | Zero-shot reasoning, coarse-to-fine visual focus, and a questioner/responder reflection chain before grounding and SAM2 propagation. | [Official code](https://github.com/iSEE-Laboratory/Refer-Agent), inspected at `083e3bd830b2144ee519b63f3aa5766d5a926b61`; benchmark-specific Ovis2.5-9B preprocessing. | High at the algorithm level. We can reproduce reason-reflect-reground with local Qwen and all 30 frames, then retain SAM3/SAM2. We do not call this an author-code reproduction. |
+| [DeRVOS (CVPR 2026)](https://openaccess.thecvf.com/content/CVPR2026/papers/Cheng_DeRVOS_Decoupling_Consistent_Trajectory_Generation_and_Multimodal_Understanding_for_Referring_CVPR_2026_paper.pdf) | Generate class-agnostic instance trajectories first, then select a trajectory by multimodal alignment. | No usable official inference repository found during this review. The architecture is trained on RVOS benchmarks. | Conceptually strong for repeated clamps: SAM3 candidates should be treated as trajectories and selected by motion/goal semantics. A faithful run is currently not available. |
+| [SPOT (CVPR 2026)](https://openaccess.thecvf.com/content/CVPR2026/papers/Fan_SPOT_Spatiotemporal_Prompt_Optimization_for_Motion-Stabilized_MLLM-Guided_Video_Segmentation_CVPR_2026_paper.pdf) | Constrain per-frame MLLM prompts with spatial and Brownian-bridge temporal optimization before SAM-style propagation. | No official runnable repository found during this review. | Useful if Qwen boxes jitter, but it cannot correct a semantically wrong entity and requires choosing motion regularization parameters. Lower priority than reflection. |
+| [Robust Promptable VOS / MoGA (CVPR 2026)](https://arxiv.org/abs/2605.12006) | Object-conditioned memory and gated low-rank adaptation improve temporal robustness under corruptions. | Benchmark/project material is available, but the method requires trained adaptation weights rather than zero-shot integration. | Relevant to low-resolution/corrupted videos, but not the main failure in FMB/RoboSet and not a minimal experiment. |
+| [Efficient VOS with Recurrent Dynamic Submodel (CVPR 2026)](https://openaccess.thecvf.com/content/CVPR2026/supplemental/Tang_Efficient_Video_Object_CVPR_2026_supplemental.pdf) | Use the previous mask to dynamically route a cheaper SAM2 submodel. | Training-dependent recurrent router. | Primarily an efficiency method; it does not address wrong role identity or wrong instance selection. |
+
+## Relations and actions
+
+| Work | Main idea | Released implementation | Applicability here |
+|---|---|---|---|
+| [SceneGraphVLM (2026)](https://arxiv.org/abs/2605.13667) | Compact TOON graph serialization, previous-predicted-graph conditioning, and hallucination-aware precision/relation rewards. | [Official code](https://github.com/markus0440/SceneGraphVLM), inspected at `a6197daf78f315c82e818c61c07cbcd450b9b3ac`; released checkpoints target PSG, PVSG, and Action Genome. | High at the algorithm level. Its checkpoint vocabulary and output schema do not match our fixed robot roles, so direct output is not comparable. We can test compact temporal event serialization, persistent prior state, and unsupported-edge rejection with Qwen3.8. |
+| [UNO (WACV 2026)](https://openaccess.thecvf.com/content/WACV2026/papers/Le_UNO_Unifying_One-stage_Video_Scene_Graph_Generation_via_Object-Centric_Visual_WACV_2026_paper.pdf) | Joint object/relation slots with temporal object-consistency learning. | Requires task-specific training on VidSGG datasets. | Supports our decision to reason over persistent entity tracks rather than independent frames, but cannot be run zero-shot on the pilot. |
+| [WorldSGG (2026)](https://arxiv.org/abs/2603.13185) | Persistent world graphs, explicit object permanence, 3D motion, and a coarse event graph followed by Graph-RAG relation reasoning. | [Repository](https://github.com/rohithpeddi/WorldSGG) is partial; key checkpoints/annotations are listed as request-only or forthcoming. | High conceptual fit. For the 30-frame pilot, a compact event timeline plus deterministic state propagation is a practical test of persistence without introducing dataset-specific training. |
+| [VISTA interaction benchmark (CVPRW 2026)](https://arxiv.org/abs/2605.01391) | Decompose evaluation into entities, actions, relational dynamics, and temporal composition instead of one aggregate VLM score. | Benchmark and code links are public. | Useful for failure reporting and verifier checks, but it is an evaluation framework rather than a graph generator. |
+
+## Selected experiments
+
+1. **All-frame entity reflection and regrounding.** Run the existing entity proposal and five-frame Qwen box tracker, show all proposed boxes over all frames to a second Qwen reflection pass, correct the role descriptions globally, and ground the corrected roles again. This preserves every frame and applies one rule to every scene.
+2. **Compact event graph with verification.** Predict initial state, action intervals, state transitions, and final state once for the full sequence. Run a second visual verifier, reject unsupported entities/edges, then expand the verified event graph deterministically to all 30 frames. This tests temporal persistence and compact serialization while keeping our ontology.
+
+Neither experiment is presented as a reproduction of the authors' reported benchmark numbers. They are controlled adaptations chosen because the released systems otherwise require incompatible vocabularies, benchmark preprocessing, or additional training.
