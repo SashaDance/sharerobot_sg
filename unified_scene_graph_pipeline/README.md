@@ -57,3 +57,9 @@ Configuration `unified_goal_roles_role_specific_v5` + `unified_split_state_actio
 ## Public output tree
 
 Each scene contains `input.json`, `frames/`, `task_spec.json`, `masks/`, `tracks.json`, `scene_graph.json`, `da3/`, `trajectory_3d.json`, `visualization.mp4`, `contact_sheet.jpg`, `validation_report.json`, and `run_report.json`. Qwen request/response audits are kept separately for reproducibility and contain no API key.
+
+## Whole-robot tracking comparison
+
+`run_robot_tracking_experiment.sh` is a segmentation-only comparison between the official RobotSeg automatic video mode (`category="robot"`) and SAM3 native video propagation from the single text prompt `robot`. It processes every frame in `manifests/pilot_11.json` and deliberately skips Qwen, all non-robot entities, relations, actions, DA3, and trajectories.
+
+The run writes per-method masks and diagnostics, plus a three-panel `visualization.mp4` and `contact_sheet.png` for every scene. The diagnostics describe temporal mask behavior without ground-truth robot masks; they are not segmentation-accuracy metrics.

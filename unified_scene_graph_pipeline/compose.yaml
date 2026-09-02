@@ -74,6 +74,27 @@ services:
               device_ids: ["1"]
               capabilities: [gpu]
 
+  robotseg:
+    profiles: [tools]
+    image: unified-sgg-robotseg:1.0.0
+    build:
+      context: .
+      dockerfile: docker/robotseg.Dockerfile
+    volumes:
+      - ${DATASET_ROOT:-/datasets}:/datasets:ro
+      - ${RUN_ROOT:-/datasets/unified_scene_graph_runs}:/runs
+      - ${MODEL_ROOT:-/datasets/unified_scene_graph_models}:/models:ro
+      - ./manifests:/manifests:ro
+    ipc: host
+    shm_size: 32gb
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["1"]
+              capabilities: [gpu]
+
   da3:
     profiles: [tools]
     image: unified-sgg-da3:1.0.0

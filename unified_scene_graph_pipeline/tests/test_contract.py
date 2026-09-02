@@ -20,6 +20,7 @@ from qwen import (  # noqa: E402
     validate_state_document,
 )
 from render import ROLE_COLORS, _draw_frame  # noqa: E402
+from robot_tracking_compare import _config as robot_tracking_config, _diagnostics  # noqa: E402
 
 
 def test_prepare_preserves_all_arbitrary_length_rgba_frames(tmp_path: Path) -> None:
@@ -138,3 +139,30 @@ def test_render_has_prompt_legend_and_strong_mask_boundary(tmp_path: Path) -> No
     pixels = np.asarray(rendered)
     header_height = 10 + 15 * 2
     assert tuple(pixels[header_height + 20, 25]) == ROLE_COLORS["manipulated_object"]
+
+
+def test_robot_tracking_experiment_is_strictly_segmentation_only() -> None:
+    config_path = Path(__file__).resolve().parents[1] / "robot_tracking_config.json"
+    config = robot_tracking_config(config_path)
+    assert config["scope"] == {
+        "entity": "whole_robot",
+        "prompt_frame_index": 0,
+        "process_every_frame": True,
+        "generate_other_entities": False,
+        "generate_scene_graph": False,
+        "generate_depth_or_trajectory": False,
+    }
+    assert config["sam3"]["text_prompt"] == "robot"
+    assert config["robotseg"]["category"] == "robot"
+
+
+def test_robot_tracking_diagnostics_do_not_claim_accuracy() -> None:
+    masks = []
+    for offset in (0, 1, 2):
+        mask = np.zeros((20, 30), dtype=bool)
+        mask[5:15, 8 + offset:18 + offset] = True
+        masks.append(mask)
+    result = _diagnostics(masks)
+    assert result["visible_frame_count"] == 3
+    assert result["median_consecutive_mask_iou"] > 0.8
+    assert "not accuracy metrics" in result["note"]

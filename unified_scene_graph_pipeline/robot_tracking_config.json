@@ -1,0 +1,34 @@
+{
+  "schema_version": "robot_tracking_comparison_v1",
+  "scope": {
+    "entity": "whole_robot",
+    "prompt_frame_index": 0,
+    "process_every_frame": true,
+    "generate_other_entities": false,
+    "generate_scene_graph": false,
+    "generate_depth_or_trajectory": false
+  },
+  "sam3": {
+    "checkpoint": "/models/sam3.pt",
+    "checkpoint_sha256": "9999e2341ceef5e136daa386eecb55cb414446a00ac2b55eb2dfd2f7c3cf8c9e",
+    "source_revision": "86ed77094094e5cabb16b0414ec60c5ba9ce0a0f",
+    "text_prompt": "robot",
+    "track_selection": "maximum temporal persistence, then mean native ranking, then lower native track id"
+  },
+  "robotseg": {
+    "checkpoint": "/models/robotseg.pt",
+    "checkpoint_sha256": "1384c38c4f313487a32503025d4566ac1d815f6be983199362fc4af19aaa06a2",
+    "source_revision": "dafb8c0d507276e2f96d2b07ac3661a7b3a41a5f",
+    "model_config": "robotseg-infer",
+    "category": "robot",
+    "automatic_prompt": true,
+    "guided_refinement": true
+  },
+  "render": {
+    "fps": 10,
+    "panel_width": 480,
+    "title_height": 62,
+    "mask_alpha": 0.52,
+    "boundary_width": 3
+  }
+}

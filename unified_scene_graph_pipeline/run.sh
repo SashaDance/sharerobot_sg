@@ -27,6 +27,7 @@ case "${1:-}" in
     require_env
     "${COMPOSE[@]}" --profile tools build core
     "${COMPOSE[@]}" --profile tools build da3
+    "${COMPOSE[@]}" --profile tools build robotseg
     ;;
   build-core)
     require_env
@@ -35,6 +36,10 @@ case "${1:-}" in
   build-da3)
     require_env
     "${COMPOSE[@]}" --profile tools build da3
+    ;;
+  build-robotseg)
+    require_env
+    "${COMPOSE[@]}" --profile tools build robotseg
     ;;
   start-qwen)
     require_env
@@ -119,8 +124,25 @@ case "${1:-}" in
     shift
     "${COMPOSE[@]}" run --rm --no-deps -T da3 "$@"
     ;;
+  robot-track-sam3)
+    require_env
+    shift
+    "${COMPOSE[@]}" run --rm --no-deps -T --entrypoint python core \
+      /pipeline/robot_tracking_compare.py segment --backend sam3 "$@"
+    ;;
+  robot-track-robotseg)
+    require_env
+    shift
+    "${COMPOSE[@]}" run --rm --no-deps -T robotseg segment --backend robotseg "$@"
+    ;;
+  robot-track-render)
+    require_env
+    shift
+    "${COMPOSE[@]}" run --rm --no-deps -T --entrypoint python core \
+      /pipeline/robot_tracking_compare.py render "$@"
+    ;;
   *)
-    echo "Usage: $0 {build|build-core|build-da3|download-qwen|download-sam2|start-qwen|start-qwen-tp2|wait-qwen|stop-qwen|prepare|entities|sam|graph|da3|trajectory|render|validate|batch|review-index} ..." >&2
+    echo "Usage: $0 {build|build-core|build-da3|build-robotseg|download-qwen|download-sam2|start-qwen|start-qwen-tp2|wait-qwen|stop-qwen|prepare|entities|sam|graph|da3|trajectory|render|validate|batch|review-index|robot-track-sam3|robot-track-robotseg|robot-track-render} ..." >&2
     exit 2
     ;;
 esac
