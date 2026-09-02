@@ -74,6 +74,150 @@ def _run_prompt(model: Any, frames: Path, prompt: str, frame_count: int) -> tupl
     }
 
 
+def _box_overlap(mask: np.ndarray, box: list[int], coordinate_scale: int) -> tuple[int, float]:
+    height, width = mask.shape
+    x_min = max(0, min(width, int(np.floor(box[0] * width / coordinate_scale))))
+    y_min = max(0, min(height, int(np.floor(box[1] * height / coordinate_scale))))
+    x_max = max(0, min(width, int(np.ceil(box[2] * width / coordinate_scale))))
+    y_max = max(0, min(height, int(np.ceil(box[3] * height / coordinate_scale))))
+    box_area = max(0, x_max - x_min) * max(0, y_max - y_min)
+    mask_area = int(mask.sum())
+    if box_area == 0 or mask_area == 0:
+        return 0, 0.0
+    intersection = int(mask[y_min:y_max, x_min:x_max].sum())
+    if intersection == 0:
+        return 0, 0.0
+    dice = 2.0 * intersection / (mask_area + box_area)
+    containment = intersection / mask_area
+    return intersection, dice + containment
+
+
+def _run_qwen_verified_text_prompts(
+    model: Any,
+    frames: Path,
+    prompts: list[str],
+    frame_grounding: list[dict[str, Any]],
+    frame_count: int,
+    coordinate_scale: int,
+) -> tuple[dict[int, np.ndarray], dict[str, Any]]:
+    grounding = {
+        int(row["frame_index"]): row["bbox_xyxy_1000"]
+        for row in frame_grounding
+    }
+    if set(grounding) != set(range(frame_count)):
+        raise ValueError("Qwen frame grounding does not match the video frames")
+    unique_prompts = list(dict.fromkeys(prompt.strip() for prompt in prompts if prompt.strip()))
+    candidates = []
+    for prompt_index, prompt in enumerate(unique_prompts):
+        state = model.init_state(
+            resource_path=str(frames),
+            offload_video_to_cpu=True,
+            async_loading_frames=False,
+            video_loader_type="cv2",
+        )
+        model.add_prompt(state, frame_idx=0, text_str=prompt)
+        prompt_candidates: dict[int, dict[int, np.ndarray]] = defaultdict(dict)
+        prompt_ranks: dict[int, list[float]] = defaultdict(list)
+        for frame_index, output in model.propagate_in_video(
+            state,
+            start_frame_idx=0,
+            max_frame_num_to_track=frame_count,
+            reverse=False,
+        ):
+            object_ids = _as_numpy(output["out_obj_ids"]).reshape(-1)
+            masks = _as_numpy(output["out_binary_masks"])
+            native_ranks = _as_numpy(output["out_probs"]).reshape(-1)
+            for index, object_id in enumerate(object_ids):
+                mask = np.asarray(masks[index]).squeeze().astype(bool)
+                if mask.any():
+                    prompt_candidates[int(object_id)][int(frame_index)] = mask
+                    prompt_ranks[int(object_id)].append(float(native_ranks[index]))
+        del state
+        for object_id, masks in prompt_candidates.items():
+            candidates.append({
+                "prompt": prompt,
+                "prompt_index": prompt_index,
+                "object_id": object_id,
+                "masks": masks,
+                "native_rank": sum(prompt_ranks[object_id]) / max(1, len(prompt_ranks[object_id])),
+            })
+    if not candidates:
+        return {}, {
+            "status": "not_found",
+            "selection_method": "qwen_all_frame_boxes_over_sam3_text_candidates",
+            "candidate_track_count": 0,
+            "candidate_prompts": unique_prompts,
+            "grounded_frame_count": sum(box is not None for box in grounding.values()),
+        }
+
+    def global_key(candidate: dict[str, Any]) -> tuple[Any, ...]:
+        matched = 0
+        overlap_sum = 0.0
+        for frame_index, box in grounding.items():
+            mask = candidate["masks"].get(frame_index)
+            if box is None or mask is None:
+                continue
+            intersection, overlap = _box_overlap(mask, box, coordinate_scale)
+            matched += int(intersection > 0)
+            overlap_sum += overlap
+        return (
+            -matched,
+            -overlap_sum,
+            -len(candidate["masks"]),
+            -candidate["native_rank"],
+            candidate["prompt_index"],
+            candidate["object_id"],
+        )
+
+    ordered = sorted(candidates, key=global_key)
+    candidate_order = {id(candidate): index for index, candidate in enumerate(ordered)}
+    global_candidate = ordered[0]
+    masks: dict[int, np.ndarray] = {}
+    selected_sources = []
+    rejected = 0
+    for frame_index in range(frame_count):
+        box = grounding[frame_index]
+        available = [candidate for candidate in candidates if frame_index in candidate["masks"]]
+        selected = None
+        if box is not None and available:
+            grounded = []
+            for candidate in available:
+                intersection, overlap = _box_overlap(
+                    candidate["masks"][frame_index], box, coordinate_scale,
+                )
+                if intersection > 0:
+                    grounded.append((
+                        -overlap,
+                        candidate_order[id(candidate)],
+                        candidate["prompt_index"],
+                        candidate["object_id"],
+                        candidate,
+                    ))
+            if grounded:
+                selected = min(grounded)[-1]
+            else:
+                rejected += 1
+        elif box is None and frame_index in global_candidate["masks"]:
+            selected = global_candidate
+        if selected is not None:
+            masks[frame_index] = selected["masks"][frame_index]
+            selected_sources.append((selected["prompt"], selected["object_id"]))
+
+    global_source = (global_candidate["prompt"], global_candidate["object_id"])
+    return masks, {
+        "status": "tracked" if masks else "not_found",
+        "selection_method": "qwen_all_frame_boxes_over_sam3_text_candidates",
+        "selected_native_track_id": global_candidate["object_id"],
+        "selected_prompt": global_candidate["prompt"],
+        "candidate_track_count": len(candidates),
+        "candidate_prompts": unique_prompts,
+        "visible_frame_count": len(masks),
+        "grounded_frame_count": sum(box is not None for box in grounding.values()),
+        "qwen_rejected_frame_count": rejected,
+        "alternate_candidate_frame_count": sum(source != global_source for source in selected_sources),
+    }
+
+
 def _run_box_prompt(
     model: Any,
     frames: Path,
@@ -331,6 +475,20 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
                         )
                     elif backend == "sam3" and prompt_mode == "text":
                         masks, track = _run_prompt(model, frames, entity["sam_prompt"], len(frame_paths))
+                    elif backend == "sam3" and prompt_mode == "qwen_track_verified_text":
+                        masks, track = _run_qwen_verified_text_prompts(
+                            model,
+                            frames,
+                            [
+                                entity[field]
+                                for field in model_config.get(
+                                    "candidate_prompts", ["sam_prompt", "canonical_name"],
+                                )
+                            ],
+                            entity["frame_grounding"],
+                            len(frame_paths),
+                            int(model_config.get("box_coordinate_scale", 1000)),
+                        )
                     else:
                         raise ValueError(f"Unsupported {backend} prompt mode: {prompt_mode}")
             except Exception as error:
@@ -355,7 +513,12 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
                 "entity_id": entity["entity_id"],
                 "role": entity["role"],
                 "sam_prompt": entity["sam_prompt"],
-                "prompt_type": "box" if prompt_mode == "qwen_bbox" else "text",
+                "prompt_type": (
+                    "box" if prompt_mode == "qwen_bbox"
+                    else "text_with_qwen_track_verifier"
+                    if prompt_mode == "qwen_track_verified_text"
+                    else "text"
+                ),
                 **track,
                 "frames": per_frame,
             })

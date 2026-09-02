@@ -18,6 +18,7 @@ from qwen import (  # noqa: E402
     validate_action_document,
     validate_entity_document,
     validate_state_document,
+    validate_tracking_document,
 )
 from render import ROLE_COLORS, _draw_frame  # noqa: E402
 from robot_tracking_compare import _config as robot_tracking_config, _diagnostics  # noqa: E402
@@ -42,11 +43,9 @@ def test_entity_schema_rejects_extra_roles_and_confidence() -> None:
         "roles": {
             "robot": {
                 "canonical_name": "gray robot arm", "sam_prompt": "gray robot arm",
-                "grounding": {"frame_index": 2, "bbox_xyxy_1000": [100, 50, 900, 950]},
             },
             "manipulated_object": {
                 "canonical_name": "blue cube", "sam_prompt": "small blue cube",
-                "grounding": {"frame_index": 1, "bbox_xyxy_1000": [300, 300, 450, 500]},
             },
             "initial_support": None, "target": None, "whole_parent": None,
         },
@@ -61,10 +60,20 @@ def test_entity_schema_rejects_extra_roles_and_confidence() -> None:
         raise AssertionError("extra role accepted")
     except ValueError:
         pass
-    invalid_box = json.loads(json.dumps(valid))
-    invalid_box["roles"]["manipulated_object"]["grounding"]["bbox_xyxy_1000"] = [450, 300, 300, 500]
+    invalid_tracking = {
+        "tracks": {
+            "robot": [[0, [100, 50, 900, 950]], [1, None]],
+            "manipulated_object": [[0, [300, 300, 450, 500]], [1, [320, 300, 470, 500]]],
+            "initial_support": None,
+            "target": None,
+            "whole_parent": None,
+        }
+    }
+    normalized = validate_tracking_document(invalid_tracking, [0, 1], valid["roles"])
+    assert normalized["robot"][1]["bbox_xyxy_1000"] is None
+    invalid_tracking["tracks"]["manipulated_object"][1][1] = [450, 300, 300, 500]
     try:
-        validate_entity_document(invalid_box, {0, 1, 2})
+        validate_tracking_document(invalid_tracking, [0, 1], valid["roles"])
         raise AssertionError("invalid grounding box accepted")
     except ValueError:
         pass

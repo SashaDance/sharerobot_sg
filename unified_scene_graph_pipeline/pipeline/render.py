@@ -79,8 +79,23 @@ def _draw_frame(
     for entity in task["entities"]:
         color_tuple = ROLE_COLORS.get(entity["role"], (210, 210, 210))
         grounding = entity.get("grounding")
-        if grounding and int(grounding["frame_index"]) == index:
-            x_min, y_min, x_max, y_max = grounding["bbox_xyxy_1000"]
+        frame_grounding = next(
+            (
+                row["bbox_xyxy_1000"]
+                for row in entity.get("frame_grounding", [])
+                if int(row["frame_index"]) == index
+            ),
+            None,
+        )
+        active_box = (
+            frame_grounding
+            if frame_grounding is not None
+            else grounding["bbox_xyxy_1000"]
+            if grounding and int(grounding["frame_index"]) == index
+            else None
+        )
+        if active_box is not None:
+            x_min, y_min, x_max, y_max = active_box
             grounding_boxes.append((
                 round(x_min * image.width / 1000),
                 round(y_min * image.height / 1000),
@@ -120,7 +135,9 @@ def _draw_frame(
         status = "visible" if entity["entity_id"] in visible_entities else "not visible"
         grounding = entity.get("grounding")
         prompt = (
-            f"SAM3 box: frame {grounding['frame_index']} {grounding['bbox_xyxy_1000']}"
+            f"SAM3 text: \"{entity['sam_prompt']}\" + Qwen all-frame verifier"
+            if entity.get("frame_grounding") is not None
+            else f"SAM box: frame {grounding['frame_index']} {grounding['bbox_xyxy_1000']}"
             if grounding else f"SAM3 prompt: \"{entity['sam_prompt']}\""
         )
         header_lines.append(

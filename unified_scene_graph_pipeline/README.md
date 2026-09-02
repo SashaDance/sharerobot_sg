@@ -5,8 +5,8 @@ This directory is a self-contained, Docker-only pipeline for reference image seq
 ## Stages
 
 1. `prepare` normalizes every source frame to ordered RGB PNG without sampling.
-2. `entities` asks the pinned local Qwen3.8-27B server for the five-role task specification.
-3. `sam` applies each Qwen text prompt to native SAM3 video inference and writes an explicit mask status for every entity/frame.
+2. `entities` asks the pinned local Qwen3.8-27B server for the five-role task specification, then runs a separate all-frame box-or-null tracking pass for those fixed identities.
+3. `sam` runs both the detector-oriented text prompt and canonical visual name through native SAM3 video inference. The Qwen tracks select/reject SAM3 candidates per frame; masks and explicit status are written for every entity/frame.
 4. `graph` asks Qwen to infer every frame from RGB, mask overlays, the goal, and role definitions.
 5. `da3` reconstructs every frame with the vendored/patched DA3 streaming implementation.
 6. `trajectory` robustly back-projects the manipulated-object mask through native DA3 depth, intrinsics, and camera-to-world poses.

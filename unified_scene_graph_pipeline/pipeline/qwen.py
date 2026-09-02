@@ -122,23 +122,19 @@ Planning goal: {goal}
 The following images are frames {frame_indices} in temporal order.
 Use visual appearance, not hidden annotations. Return exactly this JSON shape:
 {{"roles":{{
- "robot":{{"canonical_name":"specific visible name","sam_prompt":"robot arm","grounding":{{"frame_index":<supplied integer>,"bbox_xyxy_1000":[xmin,ymin,xmax,ymax]}}}},
- "manipulated_object":{{"canonical_name":"specific visible name","sam_prompt":"short visual description","grounding":{{"frame_index":<supplied integer>,"bbox_xyxy_1000":[xmin,ymin,xmax,ymax]}}}},
- "initial_support":null or {{"canonical_name":"...","sam_prompt":"...","grounding":{{"frame_index":<supplied integer>,"bbox_xyxy_1000":[xmin,ymin,xmax,ymax]}}}},
- "target":null or {{"canonical_name":"...","sam_prompt":"...","grounding":{{"frame_index":<supplied integer>,"bbox_xyxy_1000":[xmin,ymin,xmax,ymax]}}}},
- "whole_parent":null or {{"canonical_name":"...","sam_prompt":"...","grounding":{{"frame_index":<supplied integer>,"bbox_xyxy_1000":[xmin,ymin,xmax,ymax]}}}}
+ "robot":{{"canonical_name":"specific visible name","sam_prompt":"robot arm"}},
+ "manipulated_object":{{"canonical_name":"specific visible name","sam_prompt":"short visual description"}},
+ "initial_support":null or {{"canonical_name":"...","sam_prompt":"..."}},
+ "target":null or {{"canonical_name":"...","sam_prompt":"..."}},
+ "whole_parent":null or {{"canonical_name":"...","sam_prompt":"..."}}
 }},"task_actions":["canonical action labels"]}}
 Allowed task actions: reach_for, grab, lift, move, place, release, push, pour, open, close, insert, stack.
 Robot and manipulated_object must be present. Identify the manipulated object as the physical object whose position or state changes across the ordered frames, using the goal only as context. Initial support is the visible surface or receptacle supporting the manipulated object in the early frames. Target is the visible intended destination surface or receptacle, supported by the goal and the observed motion or final frames. If the goal conflicts with the visible action, trust the video; use null for a target that is neither visible nor supported by the observed action.
 
-For each non-null role, choose exactly one supplied frame where that single entity is clearest and least occluded. Return a tight bounding box around only that entity. bbox_xyxy_1000 is [left, top, right, bottom] in normalized integer coordinates: the top-left image corner is [0,0] and the bottom-right is [1000,1000]. The frame_index must be one of the supplied frame labels. Do not box a collection when the role refers to one manipulated object, and do not include nearby objects or robot parts when avoidable.
-
 Keep visually specific short descriptions: robot sam_prompt must be exactly "robot arm"; other sam_prompt values should normally be a discriminative color plus a common object noun, such as "yellow banana", "brown cup", "red cube", "black clamp", "wooden table", "orange bowl", "silver plate", or "blue container". canonical_name may remain more specific. Do not output points, masks, confidence, planning steps, synonyms, or extra roles."""
 
 
-def validate_entity_document(
-    value: dict[str, Any], allowed_frame_indices: set[int] | None = None,
-) -> dict[str, Any]:
+def validate_entity_document(value: dict[str, Any]) -> dict[str, Any]:
     if set(value) != {"roles", "task_actions"}:
         raise ValueError("Expected only roles and task_actions")
     roles = value["roles"]
@@ -150,25 +146,10 @@ def validate_entity_document(
             if role in {"robot", "manipulated_object"}:
                 raise ValueError(f"Required role {role} is null")
             continue
-        if not isinstance(entity, dict) or set(entity) != {"canonical_name", "sam_prompt", "grounding"}:
+        if not isinstance(entity, dict) or set(entity) != {"canonical_name", "sam_prompt"}:
             raise ValueError(f"Invalid entity shape for {role}")
         if not all(isinstance(entity[key], str) and entity[key].strip() for key in ("canonical_name", "sam_prompt")):
             raise ValueError(f"Empty entity value for {role}")
-        grounding = entity["grounding"]
-        if not isinstance(grounding, dict) or set(grounding) != {"frame_index", "bbox_xyxy_1000"}:
-            raise ValueError(f"Invalid grounding shape for {role}")
-        frame_index = grounding["frame_index"]
-        if not isinstance(frame_index, int) or frame_index < 0:
-            raise ValueError(f"Invalid grounding frame for {role}")
-        if allowed_frame_indices is not None and frame_index not in allowed_frame_indices:
-            raise ValueError(f"Grounding frame for {role} was not supplied")
-        box = grounding["bbox_xyxy_1000"]
-        if (
-            not isinstance(box, list) or len(box) != 4
-            or any(not isinstance(coordinate, int) or isinstance(coordinate, bool) for coordinate in box)
-            or not (0 <= box[0] < box[2] <= 1000 and 0 <= box[1] < box[3] <= 1000)
-        ):
-            raise ValueError(f"Invalid normalized grounding box for {role}")
     allowed = {"reach_for", "grab", "lift", "move", "place", "release", "push", "pour", "open", "close", "insert", "stack"}
     actions = value["task_actions"]
     if not isinstance(actions, list) or any(item not in allowed for item in actions):
@@ -177,6 +158,59 @@ def validate_entity_document(
     # deliberately independent of the dataset, episode, and Qwen wording.
     roles["robot"]["sam_prompt"] = "robot arm"
     return value
+
+
+def tracking_prompt(goal: str, roles: dict[str, Any], frame_indices: list[int]) -> str:
+    return f"""You are a visual multi-object tracker and verifier for ordered robot-manipulation frames.
+Planning goal: {goal}
+Fixed proposed task roles: {json.dumps(roles, ensure_ascii=False)}
+The following images are frames {frame_indices} in temporal order.
+
+Return exactly this compact JSON shape and no extra keys:
+{{"tracks":{{
+ "robot":[[frame_index,[xmin,ymin,xmax,ymax] or null],...],
+ "manipulated_object":[[frame_index,[xmin,ymin,xmax,ymax] or null],...],
+ "initial_support":null or [[frame_index,[xmin,ymin,xmax,ymax] or null],...],
+ "target":null or [[frame_index,[xmin,ymin,xmax,ymax] or null],...],
+ "whole_parent":null or [[frame_index,[xmin,ymin,xmax,ymax] or null],...]
+}}}}
+
+For every proposed non-null role, return exactly one row for every supplied frame, in order. Track the same physical instance over time. A box must tightly enclose only the visible pixels of that instance and use normalized integer coordinates from [0,0] at top-left to [1000,1000] at bottom-right. Return null only when that entity is completely outside the frame, fully occluded, or cannot be localized without guessing. Do not substitute a same-category distractor, merge multiple instances, include a held object in the robot box, or change the role definitions. For the robot, box all visible robot-arm pixels. Verify manipulated_object identity by its motion across the whole sequence; verify initial_support in early frames and target from the observed destination/final interaction. Do not output masks, confidence, reasoning, actions, relations, planning steps, aliases, or synonyms."""
+
+
+def validate_tracking_document(
+    value: dict[str, Any], requested: list[int], roles: dict[str, Any],
+) -> dict[str, list[dict[str, Any]] | None]:
+    if set(value) != {"tracks"} or not isinstance(value["tracks"], dict):
+        raise ValueError("Expected only tracks")
+    tracks = value["tracks"]
+    if set(tracks) != set(ROLE_NAMES):
+        raise ValueError(f"tracks must contain exactly {ROLE_NAMES}")
+    normalized: dict[str, list[dict[str, Any]] | None] = {}
+    for role in ROLE_NAMES:
+        rows = tracks[role]
+        if roles[role] is None:
+            if rows is not None:
+                raise ValueError(f"Null proposed role {role} must have a null track")
+            normalized[role] = None
+            continue
+        if not isinstance(rows, list) or len(rows) != len(requested):
+            raise ValueError(f"Track {role} must contain exactly {len(requested)} rows")
+        if any(not isinstance(row, list) or len(row) != 2 for row in rows):
+            raise ValueError(f"Each {role} track row must be [frame_index, bbox_or_null]")
+        if [row[0] for row in rows] != requested:
+            raise ValueError(f"Track {role} must contain requested frame indices in order")
+        normalized_rows = []
+        for frame_index, box in rows:
+            if box is not None and (
+                not isinstance(box, list) or len(box) != 4
+                or any(not isinstance(coordinate, int) or isinstance(coordinate, bool) for coordinate in box)
+                or not (0 <= box[0] < box[2] <= 1000 and 0 <= box[1] < box[3] <= 1000)
+            ):
+                raise ValueError(f"Invalid normalized tracking box for {role} at frame {frame_index}")
+            normalized_rows.append({"frame_index": frame_index, "bbox_xyxy_1000": box})
+        normalized[role] = normalized_rows
+    return normalized
 
 
 def entity_content(goal: str, frames: Path, indices: list[int]) -> list[dict[str, Any]]:
@@ -204,7 +238,7 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
         document, attempts = client.request(
             entity_content(context["planning_goal"], output / "frames", visual_indices),
             int(config["qwen"]["max_tokens_entities"]),
-            lambda value, allowed=set(visual_indices): validate_entity_document(value, allowed),
+            validate_entity_document,
         )
         documents.append(document)
         audit_attempts.append({"frames": visual_indices, "attempts": attempts})
@@ -219,9 +253,32 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
         merged, attempts = client.request(
             reconciliation,
             int(config["qwen"]["max_tokens_entities"]),
-            lambda value: validate_entity_document(value, set(indices)),
+            validate_entity_document,
         )
         audit_attempts.append({"stage": "reconcile", "attempts": attempts})
+    frame_grounding: dict[str, list[dict[str, Any]] | None] = {
+        role: ([] if merged["roles"][role] is not None else None) for role in ROLE_NAMES
+    }
+    tracking_audit = []
+    for current, _ in contextual_chunks(indices, int(config["qwen"]["frames_per_request"])):
+        prompt = tracking_prompt(context["planning_goal"], merged["roles"], current)
+        content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
+        for index in current:
+            content.extend([
+                {"type": "text", "text": f"frame {index}"},
+                {"type": "image_url", "image_url": {"url": data_url(output / "frames" / f"frame_{index:06d}.png")}},
+            ])
+        chunk_tracks, attempts = client.request(
+            content,
+            int(config["qwen"]["max_tokens_tracking"]),
+            lambda value, requested=current: validate_tracking_document(
+                value, requested, merged["roles"],
+            ),
+        )
+        for role in ROLE_NAMES:
+            if frame_grounding[role] is not None:
+                frame_grounding[role].extend(chunk_tracks[role] or [])
+        tracking_audit.append({"frames": current, "attempts": attempts})
     entities = []
     role_map = {}
     kinds = {
@@ -232,7 +289,13 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
         entity = merged["roles"][role]
         role_map[role] = role if entity else None
         if entity:
-            entities.append({"entity_id": role, "role": role, "entity_kind": kinds[role], **entity})
+            entities.append({
+                "entity_id": role,
+                "role": role,
+                "entity_kind": kinds[role],
+                **entity,
+                "frame_grounding": frame_grounding[role],
+            })
     result = {
         "schema_version": "unified_sgg_task_spec_v1",
         "planning_goal": context["planning_goal"],
@@ -243,14 +306,20 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
             "model": config["qwen"]["model"],
             "model_revision": config["qwen"]["revision"],
             "prompt_version": config["qwen"]["entity_prompt_version"],
+            "tracking_prompt_version": config["qwen"]["tracking_prompt_version"],
             "config_hash": config_hash(config),
             "all_frames_used": True,
+            "all_frames_tracked": True,
         },
     }
     write_json_atomic(target, result)
     write_json_atomic(output / "qwen_entities_audit.json", {
         "prompt_template": entity_prompt(context["planning_goal"], ["<ordered_frame_indices>"]),
         "chunks": audit_attempts,
+        "tracking_prompt_template": tracking_prompt(
+            context["planning_goal"], merged["roles"], ["<ordered_frame_indices>"],
+        ),
+        "tracking_chunks": tracking_audit,
     })
     complete_stage(output, "entities", fingerprint)
     update_run_report(output, "entities", "success", {"entity_count": len(entities)})
@@ -267,7 +336,10 @@ def graph_context(goal: str, task: dict[str, Any], frame_indices: list[int]) -> 
         for entity in task["entities"]
     }
     graph_entities = [
-        {key: value for key, value in entity.items() if key != "grounding"}
+        {
+            key: value for key, value in entity.items()
+            if key not in {"grounding", "frame_grounding"}
+        }
         for entity in task["entities"]
     ]
     context = f"""Planning goal: {goal}
