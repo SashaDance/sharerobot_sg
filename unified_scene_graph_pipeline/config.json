@@ -46,6 +46,7 @@
   },
   "render": {
     "version": "qwen_tracker_sam2_chunks_legend_boundaries_v5",
+    "grounding_label": "SAM2.1 box prompt: Qwen frame box, 5-frame chunks",
     "min_width": 640,
     "mask_alpha": 0.48,
     "boundary_width": 2

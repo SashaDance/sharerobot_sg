@@ -135,7 +135,9 @@ def _draw_frame(
         status = "visible" if entity["entity_id"] in visible_entities else "not visible"
         grounding = entity.get("grounding")
         prompt = (
-            f"SAM3 text: \"{entity['sam_prompt']}\" + Qwen all-frame verifier"
+            str(render_config["grounding_label"])
+            if render_config.get("grounding_label")
+            else f"SAM3 text: \"{entity['sam_prompt']}\" + Qwen all-frame verifier"
             if entity.get("frame_grounding") is not None
             else f"SAM box: frame {grounding['frame_index']} {grounding['bbox_xyxy_1000']}"
             if grounding else f"SAM3 prompt: \"{entity['sam_prompt']}\""
