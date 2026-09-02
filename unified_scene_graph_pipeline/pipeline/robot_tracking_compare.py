@@ -224,6 +224,7 @@ def _save_masks_atomic(
     masks_root.mkdir(parents=True, exist_ok=True)
     final_dir = masks_root / method
     temporary_dir = Path(tempfile.mkdtemp(prefix=f".{method}.", dir=masks_root))
+    temporary_dir.chmod(0o755)
     normalized: list[np.ndarray] = []
     with Image.open(frame_paths[0]) as first:
         width, height = first.convert("RGB").size
