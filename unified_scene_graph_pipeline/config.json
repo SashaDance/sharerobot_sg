@@ -9,7 +9,7 @@
     "max_tokens_graph": 4000,
     "retries": 2,
     "temperature": 0.0,
-    "entity_prompt_version": "unified_goal_roles_visual_v4",
+    "entity_prompt_version": "unified_goal_roles_role_specific_v5",
     "graph_prompt_version": "unified_all_frames_compact_v7"
   },
   "sam3": {

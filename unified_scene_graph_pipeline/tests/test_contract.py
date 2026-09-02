@@ -41,6 +41,7 @@ def test_entity_schema_rejects_extra_roles_and_confidence() -> None:
         "task_actions": ["move"],
     }
     assert validate_entity_document(valid) == valid
+    assert valid["roles"]["robot"]["sam_prompt"] == "robot arm"
     invalid = json.loads(json.dumps(valid))
     invalid["roles"]["tool"] = None
     try:

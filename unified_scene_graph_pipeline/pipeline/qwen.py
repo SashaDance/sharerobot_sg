@@ -122,16 +122,16 @@ Planning goal: {goal}
 The following images are frames {frame_indices} in temporal order.
 Use visual appearance, not hidden annotations. Return exactly this JSON shape:
 {{"roles":{{
- "robot":{{"canonical_name":"specific visible name","sam_prompt":"short visually specific category"}},
- "manipulated_object":{{"canonical_name":"specific visible name","sam_prompt":"short visually specific category"}},
+ "robot":{{"canonical_name":"specific visible name","sam_prompt":"robot arm"}},
+ "manipulated_object":{{"canonical_name":"specific visible name","sam_prompt":"color plus common object noun"}},
  "initial_support":null or {{"canonical_name":"...","sam_prompt":"..."}},
  "target":null or {{"canonical_name":"...","sam_prompt":"..."}},
  "whole_parent":null or {{"canonical_name":"...","sam_prompt":"..."}}
 }},"task_actions":["canonical action labels"]}}
 Allowed task actions: reach_for, grab, lift, move, place, release, push, pour, open, close, insert, stack.
-Robot and manipulated_object must be present. Identify the manipulated object as the physical object whose position or state changes across the ordered frames, using the goal only as context. If the goal wording conflicts with the visible object, describe what is visible.
+Robot and manipulated_object must be present. Identify the manipulated object as the physical object whose position or state changes across the ordered frames, using the goal only as context. Initial support is the visible surface or receptacle supporting the manipulated object in the early frames. Target is the visible intended destination surface or receptacle, supported by the goal and the observed motion or final frames. If the goal conflicts with the visible action, trust the video; use null for a target that is neither visible nor supported by the observed action.
 
-For every role, sam_prompt must name the same visible entity as canonical_name using a short detector-friendly visual phrase, normally 2-5 words. Preserve the entity's dominant visible color, shape, or material when distinguishable. Remove only brands, dataset names, and unnecessary technical wording. Do not reduce a visually specific entity to a bare generic word such as "table", "container", "tray", "plate", or "slot" when a visible descriptor can distinguish it. Good examples are "yellow banana", "brown cup", "red cube", "blue square container", "wooden table", and "silver plate". Use "robot arm" for the robot. Do not use size adjectives or lists of alternatives. Do not output boxes, points, masks, confidence, planning steps, synonyms, or extra roles."""
+Use role-specific SAM prompts. Robot must be exactly "robot arm". Manipulated object must be its dominant visible color, when distinguishable, plus one common visual noun, such as "yellow banana", "brown cup", "red cube", or "black clamp"; remove brands, dataset terms, and technical modifiers. For initial support and target, use a short common noun with at most one discriminative color, material, or shape descriptor, such as "wooden table", "orange bowl", "silver plate", or "blue container". Do not use size adjectives, compound technical names, or lists of alternatives. canonical_name may remain more specific than sam_prompt. Do not output boxes, points, masks, confidence, planning steps, synonyms, or extra roles."""
 
 
 def validate_entity_document(value: dict[str, Any]) -> dict[str, Any]:
@@ -154,6 +154,9 @@ def validate_entity_document(value: dict[str, Any]) -> dict[str, Any]:
     actions = value["task_actions"]
     if not isinstance(actions, list) or any(item not in allowed for item in actions):
         raise ValueError("Invalid task action")
+    # This role-level normalization is part of the shared pipeline contract. It is
+    # deliberately independent of the dataset, episode, and Qwen wording.
+    roles["robot"]["sam_prompt"] = "robot arm"
     return value
 
 
