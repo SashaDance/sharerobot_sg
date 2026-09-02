@@ -20,7 +20,7 @@
     "checkpoint": "/models/robotseg.pt",
     "checkpoint_sha256": "1384c38c4f313487a32503025d4566ac1d815f6be983199362fc4af19aaa06a2",
     "source_revision": "dafb8c0d507276e2f96d2b07ac3661a7b3a41a5f",
-    "model_config": "robotseg-infer",
+    "model_config": "configs/robotseg-infer",
     "category": "robot",
     "automatic_prompt": true,
     "guided_refinement": true
