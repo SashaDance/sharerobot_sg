@@ -1,0 +1,47 @@
+Experiment: Qwen grounding boxes with SAM3 video propagation
+Commit: f2bfaf52ac7bf5b2e66a8da525af29e4b64e81f8
+Direct comparison: role-specific SAM3 text prompts at 8b0925fa1c3c1310ab37ad52d2ea727065773fc5
+Outcome count: 0 fully successful, 0 partially successful, and 11 unsuccessful.
+
+Automated result
+----------------
+Qwen grounding, SAM3, render, and structural validation completed for all 11 scenes. DA3 was reused unchanged and trajectories were not assessed. The graph stage was deliberately not rerun after the mask gate failed; graph captions in these diagnostic videos are inherited from the direct-comparison run and were not evaluated.
+
+Visual assessment by scene
+--------------------------
+9 ASU table top / episode 103
+Qwen places plausible boxes on the can, robot, and table, but SAM3 produces no usable masks.
+
+11 UTokyo xArm pick and place / episode 12
+Qwen distinguishes the white moved plate from the red target plate with separate boxes. SAM3 produces no masks for either plate, the support, or the robot.
+
+15 DLR SARA grid clamp / episode 100
+The grounding boxes are coarse and the manipulated-object box covers the clamp row rather than one clamp. SAM3 produces no masks.
+
+17 DLR SARA pour / episode 55
+The target mug box is plausible and the other boxes are usable as a diagnostic, but no role propagates to a mask.
+
+18 DLR EDAN shared control / episode 21
+Qwen boxes the visible ball/container region and supporting plate, but SAM3 produces no masks.
+
+19 UCSD pick and place / episode 1267
+Qwen accurately separates the red cylinder and blue container in frame 0. SAM3 still returns empty tracks, making this a clear SAM3 box-path failure rather than a Qwen grounding failure.
+
+28 VIOLA / episode 0
+The bowl box is plausible. SAM3 yields only a brief late bowl fragment; the other roles are absent, so the scene is unusable.
+
+49 Bridge / episode 10144
+Qwen boxes the potato, bowl, work surface, and robot plausibly. SAM3 produces no masks, including for the clearly boxed potato and bowl.
+
+57 FMB / episode 141
+The support and target boxes are plausible, while the small manipulated object remains difficult. SAM3 produces no usable masks.
+
+60 PLEX RoboSuite / episode 109
+The target cube box is correct, while the manipulated-cube box is slightly misplaced. SAM3 produces no masks for either box.
+
+62 RoboSet / episode 10976
+The banana box is plausible; the target remains semantically wrong because Qwen follows the inconsistent goal and boxes the laptop. SAM3 produces no masks.
+
+Conclusion
+----------
+The SAM3 box-prompt path is unusable in this pinned upstream revision: valid native box prompts are accepted, but propagation returns empty tracks in nearly every case. This is consistent with the failure mode reported in facebookresearch/sam3 issue #204. Proceed to the planned SAM2 fallback using the same Qwen boxes so the grounder remains controlled.
