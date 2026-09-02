@@ -22,6 +22,7 @@ from qwen import (  # noqa: E402
 )
 from render import ROLE_COLORS, _draw_frame  # noqa: E402
 from robot_tracking_compare import _config as robot_tracking_config, _diagnostics  # noqa: E402
+from sam_stage import _qwen_box_chunks  # noqa: E402
 
 
 def test_prepare_preserves_all_arbitrary_length_rgba_frames(tmp_path: Path) -> None:
@@ -104,6 +105,31 @@ def test_context_chunks_never_exceed_thirty_images() -> None:
     assert [index for current, _ in chunks for index in current] == list(range(117))
     assert all(len(current) + (previous is not None) <= 30 for current, previous in chunks)
     assert all(previous == current[0] - 1 for current, previous in chunks[1:])
+
+
+def test_qwen_box_chunks_preserve_all_frames_and_null_gaps() -> None:
+    rows = [
+        {"frame_index": index, "bbox_xyxy_1000": None if index in {1, 5} else [1, 2, 3, 4]}
+        for index in range(7)
+    ]
+    chunks = _qwen_box_chunks(rows, frame_count=7, chunk_size=3)
+    assert [(start, end) for start, end, _ in chunks] == [(0, 3), (3, 6), (6, 7)]
+    assert [[row["frame_index"] for row in grounded] for _, _, grounded in chunks] == [
+        [0, 2], [3, 4], [6],
+    ]
+
+
+def test_qwen_box_chunks_reject_incomplete_grounding() -> None:
+    try:
+        _qwen_box_chunks(
+            [{"frame_index": 0, "bbox_xyxy_1000": [1, 2, 3, 4]}],
+            frame_count=2,
+            chunk_size=5,
+        )
+    except ValueError as error:
+        assert "does not match" in str(error)
+    else:
+        raise AssertionError("incomplete frame grounding accepted")
 
 
 def test_graph_schema_accepts_honest_empty_or_unchanged_chunks() -> None:

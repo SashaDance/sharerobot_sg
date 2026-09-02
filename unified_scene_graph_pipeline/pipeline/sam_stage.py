@@ -390,6 +390,126 @@ def _run_sam2_box_prompt(
     }
 
 
+def _qwen_box_chunks(
+    frame_grounding: list[dict[str, Any]],
+    frame_count: int,
+    chunk_size: int,
+) -> list[tuple[int, int, list[dict[str, Any]]]]:
+    if chunk_size < 1:
+        raise ValueError("SAM2 tracking chunk size must be positive")
+    grounding = {int(row["frame_index"]): row for row in frame_grounding}
+    if set(grounding) != set(range(frame_count)):
+        raise ValueError("Qwen frame grounding does not match the video frames")
+    return [
+        (
+            start,
+            min(frame_count, start + chunk_size),
+            [
+                grounding[index]
+                for index in range(start, min(frame_count, start + chunk_size))
+                if grounding[index]["bbox_xyxy_1000"] is not None
+            ],
+        )
+        for start in range(0, frame_count, chunk_size)
+    ]
+
+
+def _sam2_box(
+    grounding: dict[str, Any],
+    width: int,
+    height: int,
+    coordinate_scale: int,
+) -> np.ndarray:
+    x_min, y_min, x_max, y_max = grounding["bbox_xyxy_1000"]
+    return np.asarray(
+        [
+            x_min * width / coordinate_scale,
+            y_min * height / coordinate_scale,
+            x_max * width / coordinate_scale,
+            y_max * height / coordinate_scale,
+        ],
+        dtype=np.float32,
+    )
+
+
+def _run_sam2_qwen_box_chunks(
+    model: Any,
+    jpeg_frames: Path,
+    frame_grounding: list[dict[str, Any]],
+    frame_count: int,
+    width: int,
+    height: int,
+    coordinate_scale: int,
+    chunk_size: int,
+) -> tuple[dict[int, np.ndarray], dict[str, Any]]:
+    masks: dict[int, np.ndarray] = {}
+    chunks = _qwen_box_chunks(frame_grounding, frame_count, chunk_size)
+    grounded_frame_count = sum(len(rows) for _, _, rows in chunks)
+    processed_chunk_count = 0
+
+    def run_direction(
+        rows: list[dict[str, Any]],
+        start_frame: int,
+        stop_frame: int,
+        reverse: bool,
+    ) -> dict[int, np.ndarray]:
+        state = model.init_state(
+            video_path=str(jpeg_frames),
+            offload_video_to_cpu=True,
+            offload_state_to_cpu=False,
+            async_loading_frames=False,
+        )
+        try:
+            for row in rows:
+                model.add_new_points_or_box(
+                    inference_state=state,
+                    frame_idx=int(row["frame_index"]),
+                    obj_id=1,
+                    box=_sam2_box(row, width, height, coordinate_scale),
+                )
+            result: dict[int, np.ndarray] = {}
+            for output_frame_index, object_ids, mask_logits in model.propagate_in_video(
+                state,
+                start_frame_idx=start_frame,
+                max_frame_num_to_track=abs(stop_frame - start_frame),
+                reverse=reverse,
+            ):
+                ids = list(object_ids)
+                if 1 not in ids:
+                    continue
+                mask_index = ids.index(1)
+                mask = _as_numpy(mask_logits[mask_index] > 0.0).squeeze().astype(bool)
+                if mask.any():
+                    result[int(output_frame_index)] = mask
+            return result
+        finally:
+            del state
+
+    for chunk_start, chunk_end, rows in chunks:
+        if not rows:
+            continue
+        processed_chunk_count += 1
+        first_anchor = int(rows[0]["frame_index"])
+        last_anchor = int(rows[-1]["frame_index"])
+        # Every Qwen box is a conditioning prompt. Forward propagation fills
+        # gaps after the first box; a fresh reverse state fills any leading gap.
+        forward = run_direction(rows, first_anchor, chunk_end - 1, False)
+        if first_anchor > chunk_start:
+            masks.update(run_direction(rows, last_anchor, chunk_start, True))
+        masks.update(forward)
+
+    return masks, {
+        "status": "tracked" if masks else "not_found",
+        "selected_native_track_id": 1 if masks else None,
+        "candidate_track_count": 1 if masks else 0,
+        "visible_frame_count": len(masks),
+        "grounded_frame_count": grounded_frame_count,
+        "chunk_size": chunk_size,
+        "processed_chunk_count": processed_chunk_count,
+        "selection_method": "qwen_boxes_as_sam2_conditioning_frames",
+    }
+
+
 def build_model(config: dict[str, Any]) -> Any:
     backend = config.get("segmenter", {}).get("backend", "sam3")
     if backend == "sam2":
@@ -480,6 +600,17 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
                             height,
                             int(model_config.get("box_coordinate_scale", 1000)),
                         )
+                    elif backend == "sam2" and prompt_mode == "qwen_frame_boxes_chunked":
+                        masks, track = _run_sam2_qwen_box_chunks(
+                            model,
+                            sam2_jpegs,
+                            entity["frame_grounding"],
+                            len(frame_paths),
+                            width,
+                            height,
+                            int(model_config.get("box_coordinate_scale", 1000)),
+                            int(model_config.get("tracking_chunk_size", 5)),
+                        )
                     elif backend == "sam3" and prompt_mode == "qwen_bbox":
                         masks, track = _run_box_prompt(
                             model,
@@ -530,6 +661,8 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
                 "sam_prompt": entity["sam_prompt"],
                 "prompt_type": (
                     "box" if prompt_mode == "qwen_bbox"
+                    else "all_frame_boxes"
+                    if prompt_mode == "qwen_frame_boxes_chunked"
                     else "text_with_qwen_track_verifier"
                     if prompt_mode == "qwen_track_verified_text"
                     else "text"
@@ -557,9 +690,15 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
                 "backend": backend,
                 "source_revision": model_config["source_revision"],
                 "checkpoint_sha256": model_config["checkpoint_sha256"],
-                "selection": "single Qwen-grounded object track" if backend == "sam2" else "maximum temporal persistence, then mean native ranking, then lower native track id",
+                "selection": (
+                    "Qwen boxes as SAM2 conditioning frames in independent temporal chunks"
+                    if backend == "sam2" and prompt_mode == "qwen_frame_boxes_chunked"
+                    else "single Qwen-grounded object track"
+                    if backend == "sam2"
+                    else "maximum temporal persistence, then mean native ranking, then lower native track id"
+                ),
                 "prompt_mode": prompt_mode,
-                "box_propagation": model_config.get("box_propagation") if prompt_mode == "qwen_bbox" else None,
+                "box_propagation": model_config.get("box_propagation") if prompt_mode in {"qwen_bbox", "qwen_frame_boxes_chunked"} else None,
                 "config_hash": config_hash(config),
             },
         }

@@ -25,16 +25,17 @@
     "candidate_selection": "qwen_overlap_then_center_distance_v2"
   },
   "segmenter": {
-    "backend": "sam3"
+    "backend": "sam2"
   },
   "sam2": {
     "checkpoint": "/models/sam2.1_hiera_large.pt",
     "source_revision": "2b90b9f5ceec907a1c18123530e92e794ad901a4",
     "checkpoint_sha256": "2647878d5dfa5098f2f8649825738a9345572bae2d4350a2468587ece47dd318",
     "model_config": "configs/sam2.1/sam2.1_hiera_l.yaml",
-    "prompt_mode": "qwen_bbox",
+    "prompt_mode": "qwen_frame_boxes_chunked",
     "box_coordinate_scale": 1000,
-    "box_propagation": "independent_bidirectional"
+    "box_propagation": "all_qwen_boxes_bidirectional_chunks_v1",
+    "tracking_chunk_size": 5
   },
   "da3": {
     "model_name": "DA3NESTED-GIANT-LARGE-1.1",
@@ -44,7 +45,7 @@
     "checkpoint_sha256": "8ebe871a022ed58d2fc8fdfb2ebdb31d57b60fe39611c849095851a7b7c6020c"
   },
   "render": {
-    "version": "qwen_tracker_legend_boundaries_v4",
+    "version": "qwen_tracker_sam2_chunks_legend_boundaries_v5",
     "min_width": 640,
     "mask_alpha": 0.48,
     "boundary_width": 2
