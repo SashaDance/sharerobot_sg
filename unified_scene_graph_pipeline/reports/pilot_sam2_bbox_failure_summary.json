@@ -1,0 +1,87 @@
+{
+  "schema_version": "unified_sgg_pilot_failure_summary_v2",
+  "source_commit": "1b54193a0fee996e655ffe7ef30c58f416ee045c",
+  "controlled_comparison_commit": "f2bfaf52ac7bf5b2e66a8da525af29e4b64e81f8",
+  "semantic_baseline_commit": "8b0925fa1c3c1310ab37ad52d2ea727065773fc5",
+  "configuration": {
+    "entity_prompt_version": "unified_qwen_bbox_grounding_v7",
+    "graph_prompt_version": "unified_split_state_action_v8",
+    "segmenter": "SAM2.1 Hiera Large",
+    "segmenter_revision": "2b90b9f5ceec907a1c18123530e92e794ad901a4",
+    "box_propagation": "independent_bidirectional"
+  },
+  "technical_validation": {
+    "sam2_passed": 11,
+    "graph_passed": 11,
+    "render_passed": 11,
+    "validation_passed": 11,
+    "pilot_total": 11,
+    "da3_reused": true,
+    "trajectory_assessed": false
+  },
+  "semantic_outcome_count": {
+    "fully_successful": 1,
+    "partially_successful": 6,
+    "unsuccessful": 4,
+    "total": 11
+  },
+  "semantic_outcome_summary": "1 fully successful, 6 partially successful, and 4 unsuccessful.",
+  "scenes": [
+    {
+      "relative_path": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds/episode_12",
+      "semantic_status": "fully_successful",
+      "notes": "Distinct plate tracks, coherent full action sequence, and correct final plate-on-plate relation."
+    },
+    {
+      "relative_path": "18_dlr_edan_shared_control_converted_externally_to_rlds/episode_21",
+      "semantic_status": "partially_successful",
+      "notes": "Usable masks and coherent lift/holding/move, but no grounded target placement/release and the source target remains questionable."
+    },
+    {
+      "relative_path": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds/episode_1267",
+      "semantic_status": "partially_successful",
+      "notes": "Stable entity masks and correct incomplete held outcome, but no final placement in the observed clip."
+    },
+    {
+      "relative_path": "28_viola/episode_0",
+      "semantic_status": "partially_successful",
+      "notes": "Usable role masks and coherent actions, but the final graph incorrectly retains bowl-on-initial-support."
+    },
+    {
+      "relative_path": "49_bridge/episode_10144",
+      "semantic_status": "partially_successful",
+      "notes": "Clear masks and correct final potato-inside-bowl relation, but actions are entirely absent."
+    },
+    {
+      "relative_path": "57_fmb/episode_141",
+      "semantic_status": "partially_successful",
+      "notes": "Manipulated cylinder survives heavy occlusion and holding is recognized, but insertion and actions are missing."
+    },
+    {
+      "relative_path": "60_plex_robosuite/episode_109",
+      "semantic_status": "partially_successful",
+      "notes": "Distinct cube masks and correct final stack relation, but place/release are absent and holding/move persist incorrectly."
+    },
+    {
+      "relative_path": "9_asu_table_top_converted_externally_to_rlds/episode_103",
+      "semantic_status": "unsuccessful",
+      "notes": "The same table is both support and target, and the graph contains no action or state change."
+    },
+    {
+      "relative_path": "15_dlr_sara_grid_clamp_converted_externally_to_rlds/episode_100",
+      "semantic_status": "unsuccessful",
+      "notes": "The clamp is tracked, but no target is defined and the graph is empty."
+    },
+    {
+      "relative_path": "17_dlr_sara_pour_converted_externally_to_rlds/episode_55",
+      "semantic_status": "unsuccessful",
+      "notes": "The manipulated grounding does not isolate a reliable pouring source and the graph is empty."
+    },
+    {
+      "relative_path": "62_robo_set/episode_10976",
+      "semantic_status": "unsuccessful",
+      "notes": "Qwen identifies the laptop as the target instead of a bowl, so the final graph is not task-valid."
+    }
+  ],
+  "next_step": "Stop before another major change; decide whether to add a global role-validation pass and explicit temporal state/action consistency."
+}

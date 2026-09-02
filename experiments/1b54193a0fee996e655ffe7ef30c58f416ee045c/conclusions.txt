@@ -1,0 +1,48 @@
+Experiment: Qwen grounding boxes with SAM2.1 video propagation
+Commit: 1b54193a0fee996e655ffe7ef30c58f416ee045c
+Controlled comparison: the exact Qwen boxes from f2bfaf52ac7bf5b2e66a8da525af29e4b64e81f8, replacing only SAM3 with SAM2.1
+Semantic baseline: role-specific SAM3 text prompts at 8b0925fa1c3c1310ab37ad52d2ea727065773fc5
+Outcome count: 1 fully successful, 6 partially successful, and 4 unsuccessful.
+
+Automated result
+----------------
+SAM2.1, split-state graph, split-action graph, render, and structural validation completed for all 11 scenes. The task specifications and Qwen boxes were reused byte-for-byte from the SAM3 box experiment, so the segmenter is the controlled variable. DA3 was reused unchanged and trajectories were not assessed. The official optional SAM2 CUDA post-processing extension was disabled in the Docker image; upstream reports that this mainly skips small-hole filling and does not normally change segmentation results.
+
+Visual assessment by scene
+--------------------------
+9 ASU table top / episode 103 — unsuccessful
+SAM2 tracks the can during the visible manipulation and segments the robot and table, but initial support and target are the same physical table. The graph emits no actions or state change, so the placement cannot be interpreted reliably.
+
+11 UTokyo xArm pick and place / episode 12 — fully successful
+The reused Qwen boxes distinguish the white moved plate from the red target plate. SAM2 tracks both instances, and the graph gives a coherent reach/grab/lift/move/place/release sequence with the correct final plate-on-plate relation.
+
+15 DLR SARA grid clamp / episode 100 — unsuccessful
+SAM2 consistently tracks the boxed gripper-mounted clamp and workbench, but there is no target entity and the graph is empty. The requested placement is therefore not represented.
+
+17 DLR SARA pour / episode 55 — unsuccessful
+The target mug and robot are segmented, but the manipulated-object box/mask follows the small stationary cup-like region at the rear rather than a clear pouring source. The graph is empty and does not recognize pouring.
+
+18 DLR EDAN shared control / episode 21 — partially successful
+The robot, ball, support, and boxed container are tracked. Lift/holding/move are coherent, but the clip never yields a grounded placement/release into the target; the source task/target remains visually questionable.
+
+19 UCSD pick and place / episode 1267 — partially successful
+SAM2 gives stable masks for the red cylinder, blue container, support, and robot. The graph correctly recognizes reach, grab, lift, move, and the held incomplete outcome, but no final placement occurs in the observed clip.
+
+28 VIOLA / episode 0 — partially successful
+The black bowl, lazy Susan, plate, and robot are all usable, and the action sequence is substantially more coherent. The final graph still incorrectly retains bowl-on-initial-support instead of the observed final bowl/plate configuration.
+
+49 Bridge / episode 10144 — partially successful
+The potato, bowl, cutting board, and robot masks are clear, and the final potato-inside-bowl relation is now correct. The entire action sequence is still absent.
+
+57 FMB / episode 141 — partially successful
+SAM2 tracks the thin manipulated cylinder through heavy occlusion and tracks the slot/support. The graph detects holding but misses the insertion relation and action sequence.
+
+60 PLEX RoboSuite / episode 109 — partially successful
+The red manipulated cube and green target cube remain distinct and the final red-cube-on-green-cube relation is recognized. The graph does not emit place/release and incorrectly continues move/holding at the end.
+
+62 RoboSet / episode 10976 — unsuccessful
+The Qwen grounding is semantically wrong: the target is the laptop rather than a bowl, and the manipulated track does not reliably represent the banana. A syntactically valid final relation is therefore not task-valid.
+
+Conclusion
+----------
+SAM2.1 is a clear improvement over SAM3 for geometric box prompts and validates the Qwen-as-grounder design. It restores usable masks in most scenes and improves the semantic outcome from the 1/4/6 text-prompt baseline to 1/6/4, but it does not improve the number of fully successful scenes. The dominant remaining failures are graph action/state reasoning plus a few Qwen role-grounding errors, not a universal mask failure. Stop here before another major change and decide whether to add a global role-validation pass and explicit temporal state/action consistency.
