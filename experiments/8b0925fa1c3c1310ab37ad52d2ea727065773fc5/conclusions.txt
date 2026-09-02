@@ -1,0 +1,49 @@
+Experiment: split state and action graph inference
+Commit: 8b0925fa1c3c1310ab37ad52d2ea727065773fc5
+Direct comparison: role-specific single-pass graph version 96085c9ecd4ab4025fb3a95503a25dfe42baf372
+Outcome count: 1 fully successful, 4 partially successful, and 6 unsuccessful.
+
+Automated result
+----------------
+All entity, SAM3, split-state, split-action, render, and validation stages completed for all 11 scenes. Entity prompts and SAM tracks are identical to the direct-comparison version, so observed graph differences isolate the graph change. DA3 was reused unchanged and trajectories were not assessed.
+
+Visual assessment by scene
+--------------------------
+9 ASU table top / episode 103
+State inference improves during the interaction by recognizing holding. The final on-target edge is ambiguous/wrong because initial support and target are both the same table and the can is still held at the end. The action pass emits no actions, a regression from the prior reach-only output but still incorrect.
+
+11 UTokyo xArm pick and place / episode 12
+Good result. Initial relations, holding phase, and final plate-on-plate relation are coherent. Action timing is substantially cleaner; it labels the final contact as stack rather than place, which is defensible for one plate on another but differs from the planning wording.
+
+15 DLR SARA grid clamp / episode 100
+Regression in state output: the prior on-support edge becomes empty, and actions remain empty. The manipulated mask still covers the row rather than one clamp, so graph refinement alone cannot resolve the task.
+
+17 DLR SARA pour / episode 55
+Unchanged failure. Both passes are empty because the cup/support masks appear only late and the visible sequence does not provide a clean tracked pour transition.
+
+18 DLR EDAN shared control / episode 21
+Clear improvement. The action pass recognizes reach, grab, lift, and move; the state pass changes from ball-on-plate to robot-holding-ball. It correctly describes the visible lift despite the incorrect source target.
+
+19 UCSD pick and place / episode 1267
+Clear improvement. The graph now recognizes reach, grab, lift, move, and the final held state. It does not invent placement into the blue container, which is appropriate because the clip ends while holding the cylinder.
+
+28 VIOLA / episode 0
+Not improved. Actions are mostly reach_for, and the final bowl-on-plate relation is still visually incorrect because the bowl is beside the plate.
+
+49 Bridge / episode 10144
+Important state improvement: the final potato-inside-bowl relation is now present from frame 26 onward, matching the visualization. The action pass is still empty, so temporal manipulation understanding remains incomplete.
+
+57 FMB / episode 141
+Regression. Both state and action outputs are empty, whereas the single pass previously recognized reach/grab/lift/move/insert. The missing target mask remains an important limitation, but the split action prompt should still have used the RGB sequence.
+
+60 PLEX RoboSuite / episode 109
+Partial state improvement: the final relation becomes robot-holding-red-cube instead of unchanged on-table. No actions are emitted and the intended stack is not completed/recognized.
+
+62 RoboSet / episode 10976
+The split pass produces a coherent reach/grab/lift/move/place/release sequence and a final on-target relation, but it is grounded to the incorrectly identified "black laptop" target while the banana mask is absent. The apparent graph improvement is therefore not trustworthy.
+
+Conclusion
+----------
+Splitting states and actions gives meaningful gains in Bridge, EDAN, and UCSD and a partial gain in PLEX. It directly fixes the previously discussed missing Bridge inside-bowl relation. It is not uniformly better: clamp state output and FMB actions regress, VIOLA remains wrong, and RoboSet demonstrates that graph quality cannot recover from an incorrect entity role.
+
+This version is worth retaining as the current experimental branch because its state-change reasoning is better on several important cases, but it is not ready for the 100-scene run. Further improvement is no longer a small prompt tweak: it requires a more explicit temporal event representation or post-validation that checks state/action consistency, plus better target-role inference. Per the experiment rule, stop here and decide the next design before adding more complexity.

@@ -1,0 +1,51 @@
+Experiment: visually specific Qwen-to-SAM prompts
+Commit: 2c1a35eadede09644f1d0ec5aa83725aeaa75a44
+Comparison baseline: f6cb8a8f25d5b0f689939fc8e92e26edfa37eec5
+Outcome count: 1 fully successful, 6 partially successful, and 4 unsuccessful.
+
+Automated result
+----------------
+All entity, SAM3, graph, render, and validation stages completed for all 11 scenes. DA3 was reused unchanged and trajectories were not assessed.
+
+Visual assessment by scene
+--------------------------
+9 ASU table top / episode 103
+Masks remain clean for the robot, can, and table. The graph regressed: it emits reach_for throughout and leaves the can on the table after the visible lift.
+
+11 UTokyo xArm pick and place / episode 12
+Still the strongest scene. Robot, both plates, and table are segmented coherently, and the final white-plate-on-red-plate relation is present. No material mask improvement over baseline.
+
+15 DLR SARA grid clamp / episode 100
+Regression. The new prompt "black grid clamp" returns no manipulated-object track, while baseline "black clamp" tracked the row of clamps. Robot and workbench remain clean. The task still cannot isolate one clamp reliably.
+
+17 DLR SARA pour / episode 55
+Essentially unchanged. Robot and white mug are reliable; the brown cup and actual black rear tray appear in only seven late frames. The pour event is still absent.
+
+18 DLR EDAN shared control / episode 21
+Robot, yellow ball, and white plate masks are good. Qwen adds a black shelf as the target because the source goal conflicts with the visible lift-only episode; the graph now incorrectly leaves the ball on the plate. Planning-goal correction remains deliberately out of scope.
+
+19 UCSD pick and place / episode 1267
+Partial improvement: "white robot arm" increases robot visibility from 17/30 to 30/30 frames. The red cylinder remains 14/30; the black table and blue square container are still not found. Graph state remains stale.
+
+28 VIOLA / episode 0
+Black bowl and silver plate remain usable; the two-tier lazy Susan is still not found. The new graph incorrectly reports the bowl on the plate at the end, although it is visibly beside the plate.
+
+49 Bridge / episode 10144
+Regression in the robot track: "black robot arm" is visible in 5/30 frames versus 24/30 for baseline "robot arm". Potato, cutting board, and orange bowl are otherwise unchanged. The visually clear final potato-inside-bowl relation is still missing.
+
+57 FMB / episode 141
+Mixed, net regression. "blue vertical slot" fixes the previously missing target track (30/30), but "white robot arm" loses the robot completely. Consequently the previously coherent insert action and final inside relation disappear.
+
+60 PLEX RoboSuite / episode 109
+Mask improvement: the white table is now found in all frames and robot visibility rises from 13/30 to 20/30; both cubes remain stable. Qwen still emits no manipulation actions and leaves state relations unchanged.
+
+62 RoboSet / episode 10976
+Regression in role identification. The banana is still not found, and Qwen now calls the large rectangular surface a "black laptop" and uses it as the target. This is not a reliable task target.
+
+Conclusion
+----------
+The unrestricted 2-5 word visual-prompt change is not accepted as an improvement. It helps generic support/target prompts in FMB and PLEX and helps the UCSD robot, but it also over-specifies or misidentifies entities in DLR clamp, Bridge, FMB, and RoboSet. Graph generation remains unstable even when masks are good (ASU, Bridge, PLEX), so better masks alone do not resolve state/action inference.
+
+Recommended next global revision
+--------------------------------
+Use role-specific prompt rules: force the robot SAM prompt to "robot arm"; keep the manipulated object to dominant color plus one common visual noun; allow one discriminative color/material/shape descriptor for supports and targets. Define initial support from the first frames and target from the observed final destination, allowing null when no destination is visible. This preserves the useful specificity without the regressions caused by technical or overly specific phrases.

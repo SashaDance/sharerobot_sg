@@ -1,0 +1,49 @@
+Experiment: role-specific Qwen-to-SAM prompts
+Commit: 96085c9ecd4ab4025fb3a95503a25dfe42baf372
+Comparisons: baseline f6cb8a8f25d5b0f689939fc8e92e26edfa37eec5; unrestricted visual prompts 2c1a35eadede09644f1d0ec5aa83725aeaa75a44
+Outcome count: 1 fully successful, 6 partially successful, and 4 unsuccessful.
+
+Automated result
+----------------
+All entity, SAM3, graph, render, and validation stages completed for all 11 scenes. DA3 was reused unchanged and trajectories were not assessed.
+
+Visual assessment by scene
+--------------------------
+9 ASU table top / episode 103
+Robot, can, and table masks remain clean. The graph still regresses to reach_for across most frames and leaves the visibly lifted can on the table.
+
+11 UTokyo xArm pick and place / episode 12
+Good result. All four entities are tracked, action timing is broadly coherent, and the final white-plate-on-red-plate relation is present.
+
+15 DLR SARA grid clamp / episode 100
+The concise "black clamp" prompt recovers the manipulated-object track lost by the prior experiment. It still selects the full row rather than one clamp, so the graph remains unchanged and no placement is recognized.
+
+17 DLR SARA pour / episode 55
+Unchanged. Robot and white mug are reliable; brown cup and actual black rear tray occur in only seven late frames. The pour event is absent.
+
+18 DLR EDAN shared control / episode 21
+Robot, yellow ball, and white plate masks are good. The incorrect source goal still makes Qwen add the black shelf as a target, and the graph leaves the ball on the plate despite the visible lift. Goal correction is out of scope for this experiment.
+
+19 UCSD pick and place / episode 1267
+Equivalent to baseline: robot is tracked in 17/30 frames, cylinder in 14/30, and table/container are absent. Graph state remains stale. The earlier gain from a color-qualified robot prompt is intentionally traded away for cross-dataset robot stability.
+
+28 VIOLA / episode 0
+Bowl and plate masks are reliable; lazy Susan remains absent. The graph recognizes a manipulation sequence but incorrectly ends with bowl on plate, while the bowl is visibly beside the plate.
+
+49 Bridge / episode 10144
+Robot tracking recovers to 24/30 frames; potato, board, and bowl remain usable. The final potato-inside-bowl relation is still missed despite adequate final masks.
+
+57 FMB / episode 141
+Robot and manipulated cylinder recover relative to the unrestricted experiment. The shorter "blue slot" target prompt is not found; the graph recognizes insert frames but ends in holding rather than inside.
+
+60 PLEX RoboSuite / episode 109
+The white-table prompt adds a stable support mask, while both cubes remain stable. This is a real mask improvement over baseline, but the graph still emits no actions and no state change.
+
+62 RoboSet / episode 10976
+Robot and table masks are clean; banana remains absent. Qwen still misidentifies the large rectangular surface as a black laptop target. This is an entity-role error, not a SAM tracking failure.
+
+Conclusion
+----------
+This role-specific formulation is preferable to the unrestricted prompt experiment: it removes the clamp and robot regressions and preserves the PLEX support gain. Relative to baseline, however, the improvement is small. FMB demonstrates that a shape adjective can be necessary for a target, while RoboSet requires better role inference rather than prompt wording.
+
+The dominant remaining failure is graph inference. ASU, Bridge, and PLEX have adequate masks but wrong or unchanged state/action outputs; VIOLA also receives an incorrect final relation. The next justified global experiment is to separate per-frame state inference from temporal action inference, then combine the two validated outputs.

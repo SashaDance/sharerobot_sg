@@ -8,7 +8,10 @@ data/
 paper/
 report/
 legacy_code/
-experiments/
+experiments/*
+!experiments/*/
+experiments/*/*
+!experiments/*/conclusions.txt
 
 unified_scene_graph_pipeline/pilot_visualizations/
 unified_scene_graph_pipeline/runs/
