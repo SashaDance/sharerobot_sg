@@ -4,6 +4,10 @@
     "repository": "https://github.com/facebookresearch/sam3.git",
     "commit": "86ed77094094e5cabb16b0414ec60c5ba9ce0a0f"
   },
+  "sam2": {
+    "repository": "https://github.com/facebookresearch/sam2.git",
+    "commit": "2b90b9f5ceec907a1c18123530e92e794ad901a4"
+  },
   "depth_anything_3": {
     "repository": "https://github.com/ByteDance-Seed/Depth-Anything-3.git",
     "commit": "3d835ec1a5802d64a8b8b15f817a1ab54809bfe4",

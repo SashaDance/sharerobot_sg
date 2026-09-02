@@ -20,6 +20,18 @@
     "box_coordinate_scale": 1000,
     "box_propagation": "independent_bidirectional"
   },
+  "segmenter": {
+    "backend": "sam2"
+  },
+  "sam2": {
+    "checkpoint": "/models/sam2.1_hiera_large.pt",
+    "source_revision": "2b90b9f5ceec907a1c18123530e92e794ad901a4",
+    "checkpoint_sha256": "2647878d5dfa5098f2f8649825738a9345572bae2d4350a2468587ece47dd318",
+    "model_config": "configs/sam2.1/sam2.1_hiera_l.yaml",
+    "prompt_mode": "qwen_bbox",
+    "box_coordinate_scale": 1000,
+    "box_propagation": "independent_bidirectional"
+  },
   "da3": {
     "model_name": "DA3NESTED-GIANT-LARGE-1.1",
     "source_revision": "3d835ec1a5802d64a8b8b15f817a1ab54809bfe4",

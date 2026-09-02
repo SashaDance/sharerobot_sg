@@ -81,6 +81,30 @@ case "${1:-}" in
       -v "${MODEL_ROOT}:/models" -v "$ROOT_DIR/model_download.py:/download.py:ro" \
       vllm/vllm-openai:v0.24.0 /download.py
     ;;
+  download-sam2)
+    require_env
+    set -a
+    # shellcheck disable=SC1090
+    source "$RUNTIME_ENV"
+    set +a
+    mkdir -p "${MODEL_ROOT}"
+    target="${MODEL_ROOT}/sam2.1_hiera_large.pt"
+    expected="2647878d5dfa5098f2f8649825738a9345572bae2d4350a2468587ece47dd318"
+    if [[ -f "$target" ]] && [[ "$(sha256sum "$target" | awk '{print $1}')" == "$expected" ]]; then
+      echo "SAM2.1 checkpoint already present and verified"
+      exit 0
+    fi
+    docker run --rm --user 0:0 -v "${MODEL_ROOT}:/models" curlimages/curl:8.12.1 \
+      -fL --retry 3 --output /models/.sam2.1_hiera_large.pt.tmp \
+      https://huggingface.co/facebook/sam2.1-hiera-large/resolve/main/sam2.1_hiera_large.pt
+    actual="$(sha256sum "${MODEL_ROOT}/.sam2.1_hiera_large.pt.tmp" | awk '{print $1}')"
+    if [[ "$actual" != "$expected" ]]; then
+      echo "SAM2.1 checkpoint hash mismatch: $actual" >&2
+      exit 1
+    fi
+    mv "${MODEL_ROOT}/.sam2.1_hiera_large.pt.tmp" "$target"
+    echo "SAM2.1 checkpoint downloaded and verified"
+    ;;
   stop-qwen)
     require_env
     "${COMPOSE[@]}" stop qwen qwen-proxy
@@ -96,7 +120,7 @@ case "${1:-}" in
     "${COMPOSE[@]}" run --rm --no-deps -T da3 "$@"
     ;;
   *)
-    echo "Usage: $0 {build|build-core|build-da3|download-qwen|start-qwen|start-qwen-tp2|wait-qwen|stop-qwen|prepare|entities|sam|graph|da3|trajectory|render|validate|batch|review-index} ..." >&2
+    echo "Usage: $0 {build|build-core|build-da3|download-qwen|download-sam2|start-qwen|start-qwen-tp2|wait-qwen|stop-qwen|prepare|entities|sam|graph|da3|trajectory|render|validate|batch|review-index} ..." >&2
     exit 2
     ;;
 esac
