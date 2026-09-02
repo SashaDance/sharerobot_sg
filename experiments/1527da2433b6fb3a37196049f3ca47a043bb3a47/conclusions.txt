@@ -1,0 +1,47 @@
+Experiment: SAM2.1 box-grounded pilot with corrected DLR EDAN scene
+Commit: 1527da2433b6fb3a37196049f3ca47a043bb3a47
+Change from 1b54193a0fee996e655ffe7ef30c58f416ee045c: replace invalid EDAN episode 21 with goal-verified episode 86; pipeline configuration unchanged
+Outcome count: 2 fully successful, 5 partially successful, and 4 unsuccessful.
+
+Automated result
+----------------
+Prepare, Qwen entities, SAM2.1, Qwen graph, DA3, trajectory, render, and structural validation completed for all 11 scenes. DA3 initially did not run for the new EDAN scene because the orchestration loop skipped it; the isolated retry succeeded with 30 depth files and 30 poses, after which all 11 validations passed. Trajectories were produced but were not visually assessed.
+
+Visual assessment by scene
+--------------------------
+9 ASU table top / episode 103 — unsuccessful
+The can, robot, and table are segmented, but support and target are the same table. The graph reports the can on both from frame 0 and emits no actions, so it cannot represent the placement.
+
+11 UTokyo xArm pick and place / episode 12 — fully successful
+The white moved plate and red target plate remain distinct. Masks are stable, the graph gives a coherent reach/grab/lift/move/place/release sequence, and the final plate-on-plate state is correct.
+
+15 DLR SARA grid clamp / episode 100 — unsuccessful
+This rerun grounds the manipulated object as the row of clamps rather than one manipulated clamp. The graph is static and contains no actions or target relation.
+
+17 DLR SARA pour / episode 55 — unsuccessful
+The robot and mug are visible, but the manipulated grounding does not isolate a reliable pouring source. No pouring state or action is inferred.
+
+18 DLR EDAN shared control / episode 86 — partially successful
+The replacement task is valid: the red mug starts on the glass table and is visibly picked up. Qwen grounds the correct mug/table, and SAM2 tracks all three entities for 30 frames. Actions correctly progress through reach, grab, lift, and move, but the graph incorrectly retains mug-on-table and never adds robot-holding-mug.
+
+19 UCSD pick and place / episode 1267 — partially successful
+Entity masks are stable and reach/grab/lift/move plus the held outcome are correct. The observed clip ends while the object is held, so there is no completed placement into the container.
+
+28 VIOLA / episode 0 — fully successful
+The bowl, lazy Susan, plate, and robot masks are usable. The graph now produces the complete reach/grab/lift/move/place/release sequence and the correct final bowl-on-plate relation.
+
+49 Bridge / episode 10144 — partially successful
+The masks and final potato-inside-bowl state are correct, including the holding-to-release state change. The action sequence remains entirely absent.
+
+57 FMB / episode 141 — partially successful
+The thin cylinder survives heavy occlusion and holding is recognized, but the insertion relation and action sequence are missing.
+
+60 PLEX RoboSuite / episode 109 — partially successful
+The red and green cubes are distinct and the final stack relation is correct. Place/release are missing, and move incorrectly persists on the final frame.
+
+62 RoboSet / episode 10976 — unsuccessful
+The target remains incorrectly grounded as the laptop instead of a bowl, and the manipulated track does not reliably represent the banana. The final relation is therefore not task-valid.
+
+Conclusion
+----------
+Replacing EDAN episode 21 was correct: episode 86 has an unambiguous goal that matches the video, and failures on it can now be attributed to the pipeline. Its masks are successful, while state reasoning is inconsistent with the observed lift. The clean rerun also shows that Qwen outputs are not fully reproducible at the semantic level even with temperature 0: VIOLA improved from partial to full, while clamp grounding regressed. Before using larger comparisons, model responses or task specifications should be cached and treated as fixed experiment inputs.
