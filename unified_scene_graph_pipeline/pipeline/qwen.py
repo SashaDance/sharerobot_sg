@@ -122,14 +122,16 @@ Planning goal: {goal}
 The following images are frames {frame_indices} in temporal order.
 Use visual appearance, not hidden annotations. Return exactly this JSON shape:
 {{"roles":{{
- "robot":{{"canonical_name":"specific visible name","sam_prompt":"one simple visual category"}},
- "manipulated_object":{{"canonical_name":"specific visible name","sam_prompt":"one simple visual category"}},
+ "robot":{{"canonical_name":"specific visible name","sam_prompt":"short visually specific category"}},
+ "manipulated_object":{{"canonical_name":"specific visible name","sam_prompt":"short visually specific category"}},
  "initial_support":null or {{"canonical_name":"...","sam_prompt":"..."}},
  "target":null or {{"canonical_name":"...","sam_prompt":"..."}},
  "whole_parent":null or {{"canonical_name":"...","sam_prompt":"..."}}
 }},"task_actions":["canonical action labels"]}}
 Allowed task actions: reach_for, grab, lift, move, place, release, push, pour, open, close, insert, stack.
-Robot and manipulated_object must be present. Identify the manipulated object as the physical object whose position or state changes across the ordered frames, using the goal only as context. If the goal wording conflicts with the visible object, describe what is visible. canonical_name may be specific, but sam_prompt must use a common detector-friendly noun category, not a dataset term, brand, technical part name, size adjective, or list of alternatives. For manipulated_object, prefix the common noun with its dominant visible color whenever that color is distinguishable (for example "yellow banana", "brown cup", or "red cube"). For robot use the simple category "robot arm". For other roles, add one color or shape adjective only when it distinguishes visible instances. Do not output boxes, points, masks, confidence, planning steps, synonyms, or extra roles."""
+Robot and manipulated_object must be present. Identify the manipulated object as the physical object whose position or state changes across the ordered frames, using the goal only as context. If the goal wording conflicts with the visible object, describe what is visible.
+
+For every role, sam_prompt must name the same visible entity as canonical_name using a short detector-friendly visual phrase, normally 2-5 words. Preserve the entity's dominant visible color, shape, or material when distinguishable. Remove only brands, dataset names, and unnecessary technical wording. Do not reduce a visually specific entity to a bare generic word such as "table", "container", "tray", "plate", or "slot" when a visible descriptor can distinguish it. Good examples are "yellow banana", "brown cup", "red cube", "blue square container", "wooden table", and "silver plate". Use "robot arm" for the robot. Do not use size adjectives or lists of alternatives. Do not output boxes, points, masks, confidence, planning steps, synonyms, or extra roles."""
 
 
 def validate_entity_document(value: dict[str, Any]) -> dict[str, Any]:
