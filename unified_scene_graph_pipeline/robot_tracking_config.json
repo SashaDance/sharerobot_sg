@@ -4,6 +4,7 @@
     "entity": "whole_robot",
     "prompt_frame_index": 0,
     "process_every_frame": true,
+    "shared_staging": "numeric JPEG, quality 100, chroma subsampling disabled",
     "generate_other_entities": false,
     "generate_scene_graph": false,
     "generate_depth_or_trajectory": false

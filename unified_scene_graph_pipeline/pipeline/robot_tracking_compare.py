@@ -101,7 +101,7 @@ def _robotseg_model(config: dict[str, Any]) -> Any:
     )
 
 
-def _prepare_robotseg_frames(frame_paths: list[Path], target: Path) -> None:
+def _prepare_ordered_frames(frame_paths: list[Path], target: Path) -> None:
     target.mkdir()
     for index, frame_path in enumerate(frame_paths):
         with Image.open(frame_path) as image:
@@ -116,7 +116,7 @@ def _robotseg_masks(
     temporary_frames: Path,
     config: dict[str, Any],
 ) -> tuple[dict[int, np.ndarray], dict[str, Any]]:
-    _prepare_robotseg_frames(frame_paths, temporary_frames)
+    _prepare_ordered_frames(frame_paths, temporary_frames)
     category = config["robotseg"]["category"]
     state = model.init_state(
         video_path=str(temporary_frames),
@@ -301,13 +301,15 @@ def segment_manifest(
             continue
         import torch
 
-        if backend == "sam3":
-            with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
-                masks, track = _sam3_masks(model, frames_dir, len(frame_paths), config)
-        else:
-            with tempfile.TemporaryDirectory(prefix=".robotseg_frames.", dir=scene_output) as temporary:
+        with tempfile.TemporaryDirectory(prefix=".ordered_frames.", dir=scene_output) as temporary:
+            staged_frames = Path(temporary) / "frames"
+            if backend == "sam3":
+                _prepare_ordered_frames(frame_paths, staged_frames)
                 with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
-                    masks, track = _robotseg_masks(model, frame_paths, Path(temporary) / "frames", config)
+                    masks, track = _sam3_masks(model, staged_frames, len(frame_paths), config)
+            else:
+                with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
+                    masks, track = _robotseg_masks(model, frame_paths, staged_frames, config)
         _save_masks_atomic(scene_output, backend, masks, track, frame_paths, config, fingerprint)
         results.append({"relative_path": str(relative), "status": "success"})
         gc.collect()

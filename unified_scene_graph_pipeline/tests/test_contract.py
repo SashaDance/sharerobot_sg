@@ -148,6 +148,7 @@ def test_robot_tracking_experiment_is_strictly_segmentation_only() -> None:
         "entity": "whole_robot",
         "prompt_frame_index": 0,
         "process_every_frame": True,
+        "shared_staging": "numeric JPEG, quality 100, chroma subsampling disabled",
         "generate_other_entities": False,
         "generate_scene_graph": False,
         "generate_depth_or_trajectory": False,
