@@ -74,13 +74,24 @@ def _draw_frame(
     image = Image.open(output / "frames" / f"frame_{index:06d}.png").convert("RGB")
     pixels = np.asarray(image).copy()
     labels = []
+    grounding_boxes = []
     visible_entities: set[str] = set()
     for entity in task["entities"]:
+        color_tuple = ROLE_COLORS.get(entity["role"], (210, 210, 210))
+        grounding = entity.get("grounding")
+        if grounding and int(grounding["frame_index"]) == index:
+            x_min, y_min, x_max, y_max = grounding["bbox_xyxy_1000"]
+            grounding_boxes.append((
+                round(x_min * image.width / 1000),
+                round(y_min * image.height / 1000),
+                round(x_max * image.width / 1000),
+                round(y_max * image.height / 1000),
+                color_tuple,
+            ))
         mask = np.asarray(Image.open(output / "masks" / entity["entity_id"] / f"frame_{index:06d}.png").convert("L")) > 0
         if not mask.any():
             continue
         visible_entities.add(entity["entity_id"])
-        color_tuple = ROLE_COLORS.get(entity["role"], (210, 210, 210))
         color = np.asarray(color_tuple)
         pixels[mask] = ((1.0 - mask_alpha) * pixels[mask] + mask_alpha * color).astype(np.uint8)
         pixels[_mask_boundary(mask, boundary_width)] = color
@@ -96,6 +107,10 @@ def _draw_frame(
             Image.Resampling.LANCZOS,
         )
         labels = [(round(x * scale), round(y * scale), label, color) for x, y, label, color in labels]
+        grounding_boxes = [
+            (round(x_min * scale), round(y_min * scale), round(x_max * scale), round(y_max * scale), color)
+            for x_min, y_min, x_max, y_max, color in grounding_boxes
+        ]
 
     font = ImageFont.load_default()
     line_height = 15
@@ -103,9 +118,13 @@ def _draw_frame(
     for entity in task["entities"]:
         marker = ROLE_MARKERS.get(entity["role"], "?")
         status = "visible" if entity["entity_id"] in visible_entities else "not visible"
+        grounding = entity.get("grounding")
+        prompt = (
+            f"SAM3 box: frame {grounding['frame_index']} {grounding['bbox_xyxy_1000']}"
+            if grounding else f"SAM3 prompt: \"{entity['sam_prompt']}\""
+        )
         header_lines.append(
-            f"{marker} {entity['role']} | canonical: {entity['canonical_name']} | "
-            f"SAM3 prompt: \"{entity['sam_prompt']}\" | {status}"
+            f"{marker} {entity['role']} | canonical: {entity['canonical_name']} | {prompt} | {status}"
         )
     header_height = 10 + line_height * len(header_lines)
 
@@ -121,6 +140,12 @@ def _draw_frame(
     canvas = Image.new("RGB", (canvas_width, canvas_height), (16, 18, 22))
     canvas.paste(rendered, (0, header_height))
     draw = ImageDraw.Draw(canvas)
+    for x_min, y_min, x_max, y_max, color in grounding_boxes:
+        draw.rectangle(
+            (x_min, y_min + header_height, x_max, y_max + header_height),
+            outline=color,
+            width=max(2, boundary_width),
+        )
     draw.line((0, header_height - 1, canvas_width, header_height - 1), fill=(75, 80, 90), width=1)
     for line_index, line in enumerate(header_lines):
         y = 5 + line_index * line_height

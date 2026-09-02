@@ -122,19 +122,23 @@ Planning goal: {goal}
 The following images are frames {frame_indices} in temporal order.
 Use visual appearance, not hidden annotations. Return exactly this JSON shape:
 {{"roles":{{
- "robot":{{"canonical_name":"specific visible name","sam_prompt":"robot arm"}},
- "manipulated_object":{{"canonical_name":"specific visible name","sam_prompt":"common object noun"}},
- "initial_support":null or {{"canonical_name":"...","sam_prompt":"..."}},
- "target":null or {{"canonical_name":"...","sam_prompt":"..."}},
- "whole_parent":null or {{"canonical_name":"...","sam_prompt":"..."}}
+ "robot":{{"canonical_name":"specific visible name","sam_prompt":"robot arm","grounding":{{"frame_index":<supplied integer>,"bbox_xyxy_1000":[xmin,ymin,xmax,ymax]}}}},
+ "manipulated_object":{{"canonical_name":"specific visible name","sam_prompt":"short visual description","grounding":{{"frame_index":<supplied integer>,"bbox_xyxy_1000":[xmin,ymin,xmax,ymax]}}}},
+ "initial_support":null or {{"canonical_name":"...","sam_prompt":"...","grounding":{{"frame_index":<supplied integer>,"bbox_xyxy_1000":[xmin,ymin,xmax,ymax]}}}},
+ "target":null or {{"canonical_name":"...","sam_prompt":"...","grounding":{{"frame_index":<supplied integer>,"bbox_xyxy_1000":[xmin,ymin,xmax,ymax]}}}},
+ "whole_parent":null or {{"canonical_name":"...","sam_prompt":"...","grounding":{{"frame_index":<supplied integer>,"bbox_xyxy_1000":[xmin,ymin,xmax,ymax]}}}}
 }},"task_actions":["canonical action labels"]}}
 Allowed task actions: reach_for, grab, lift, move, place, release, push, pour, open, close, insert, stack.
 Robot and manipulated_object must be present. Identify the manipulated object as the physical object whose position or state changes across the ordered frames, using the goal only as context. Initial support is the visible surface or receptacle supporting the manipulated object in the early frames. Target is the visible intended destination surface or receptacle, supported by the goal and the observed motion or final frames. If the goal conflicts with the visible action, trust the video; use null for a target that is neither visible nor supported by the observed action.
 
-Use noun-only SAM prompts without visual descriptions. Robot must be exactly "robot arm". For every other role, sam_prompt must be only the shortest common object category, such as "banana", "cup", "cube", "clamp", "table", "bowl", "plate", "container", or "slot". Remove colors, sizes, shapes, materials, brands, dataset terms, and technical modifiers. canonical_name should remain visually specific and may be more detailed than sam_prompt. Do not output boxes, points, masks, confidence, planning steps, synonyms, or extra roles."""
+For each non-null role, choose exactly one supplied frame where that single entity is clearest and least occluded. Return a tight bounding box around only that entity. bbox_xyxy_1000 is [left, top, right, bottom] in normalized integer coordinates: the top-left image corner is [0,0] and the bottom-right is [1000,1000]. The frame_index must be one of the supplied frame labels. Do not box a collection when the role refers to one manipulated object, and do not include nearby objects or robot parts when avoidable.
+
+Keep visually specific short descriptions: robot sam_prompt must be exactly "robot arm"; other sam_prompt values should normally be a discriminative color plus a common object noun, such as "yellow banana", "brown cup", "red cube", "black clamp", "wooden table", "orange bowl", "silver plate", or "blue container". canonical_name may remain more specific. Do not output points, masks, confidence, planning steps, synonyms, or extra roles."""
 
 
-def validate_entity_document(value: dict[str, Any]) -> dict[str, Any]:
+def validate_entity_document(
+    value: dict[str, Any], allowed_frame_indices: set[int] | None = None,
+) -> dict[str, Any]:
     if set(value) != {"roles", "task_actions"}:
         raise ValueError("Expected only roles and task_actions")
     roles = value["roles"]
@@ -146,10 +150,25 @@ def validate_entity_document(value: dict[str, Any]) -> dict[str, Any]:
             if role in {"robot", "manipulated_object"}:
                 raise ValueError(f"Required role {role} is null")
             continue
-        if not isinstance(entity, dict) or set(entity) != {"canonical_name", "sam_prompt"}:
+        if not isinstance(entity, dict) or set(entity) != {"canonical_name", "sam_prompt", "grounding"}:
             raise ValueError(f"Invalid entity shape for {role}")
-        if not all(isinstance(entity[key], str) and entity[key].strip() for key in entity):
+        if not all(isinstance(entity[key], str) and entity[key].strip() for key in ("canonical_name", "sam_prompt")):
             raise ValueError(f"Empty entity value for {role}")
+        grounding = entity["grounding"]
+        if not isinstance(grounding, dict) or set(grounding) != {"frame_index", "bbox_xyxy_1000"}:
+            raise ValueError(f"Invalid grounding shape for {role}")
+        frame_index = grounding["frame_index"]
+        if not isinstance(frame_index, int) or frame_index < 0:
+            raise ValueError(f"Invalid grounding frame for {role}")
+        if allowed_frame_indices is not None and frame_index not in allowed_frame_indices:
+            raise ValueError(f"Grounding frame for {role} was not supplied")
+        box = grounding["bbox_xyxy_1000"]
+        if (
+            not isinstance(box, list) or len(box) != 4
+            or any(not isinstance(coordinate, int) or isinstance(coordinate, bool) for coordinate in box)
+            or not (0 <= box[0] < box[2] <= 1000 and 0 <= box[1] < box[3] <= 1000)
+        ):
+            raise ValueError(f"Invalid normalized grounding box for {role}")
     allowed = {"reach_for", "grab", "lift", "move", "place", "release", "push", "pour", "open", "close", "insert", "stack"}
     actions = value["task_actions"]
     if not isinstance(actions, list) or any(item not in allowed for item in actions):
@@ -185,7 +204,7 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
         document, attempts = client.request(
             entity_content(context["planning_goal"], output / "frames", visual_indices),
             int(config["qwen"]["max_tokens_entities"]),
-            validate_entity_document,
+            lambda value, allowed=set(visual_indices): validate_entity_document(value, allowed),
         )
         documents.append(document)
         audit_attempts.append({"frames": visual_indices, "attempts": attempts})
@@ -200,7 +219,7 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
         merged, attempts = client.request(
             reconciliation,
             int(config["qwen"]["max_tokens_entities"]),
-            validate_entity_document,
+            lambda value: validate_entity_document(value, set(indices)),
         )
         audit_attempts.append({"stage": "reconcile", "attempts": attempts})
     entities = []
@@ -247,8 +266,12 @@ def graph_context(goal: str, task: dict[str, Any], frame_indices: list[int]) -> 
         }
         for entity in task["entities"]
     }
+    graph_entities = [
+        {key: value for key, value in entity.items() if key != "grounding"}
+        for entity in task["entities"]
+    ]
     context = f"""Planning goal: {goal}
-Entities: {json.dumps(task['entities'], ensure_ascii=False)}
+Entities: {json.dumps(graph_entities, ensure_ascii=False)}
 Frames to output: {frame_indices}
 Each image is the RGB frame with transparent mask overlays. Mask color legend: {json.dumps(mask_legend)}. Use the image itself, masks, goal, and role specification only."""
     return entity_ids, mask_legend, context

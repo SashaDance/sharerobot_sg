@@ -39,8 +39,14 @@ def test_prepare_preserves_all_arbitrary_length_rgba_frames(tmp_path: Path) -> N
 def test_entity_schema_rejects_extra_roles_and_confidence() -> None:
     valid = {
         "roles": {
-            "robot": {"canonical_name": "gray robot arm", "sam_prompt": "gray robot arm"},
-            "manipulated_object": {"canonical_name": "blue cube", "sam_prompt": "small blue cube"},
+            "robot": {
+                "canonical_name": "gray robot arm", "sam_prompt": "gray robot arm",
+                "grounding": {"frame_index": 2, "bbox_xyxy_1000": [100, 50, 900, 950]},
+            },
+            "manipulated_object": {
+                "canonical_name": "blue cube", "sam_prompt": "small blue cube",
+                "grounding": {"frame_index": 1, "bbox_xyxy_1000": [300, 300, 450, 500]},
+            },
             "initial_support": None, "target": None, "whole_parent": None,
         },
         "task_actions": ["move"],
@@ -52,6 +58,13 @@ def test_entity_schema_rejects_extra_roles_and_confidence() -> None:
     try:
         validate_entity_document(invalid)
         raise AssertionError("extra role accepted")
+    except ValueError:
+        pass
+    invalid_box = json.loads(json.dumps(valid))
+    invalid_box["roles"]["manipulated_object"]["grounding"]["bbox_xyxy_1000"] = [450, 300, 300, 500]
+    try:
+        validate_entity_document(invalid_box, {0, 1, 2})
+        raise AssertionError("invalid grounding box accepted")
     except ValueError:
         pass
     try:

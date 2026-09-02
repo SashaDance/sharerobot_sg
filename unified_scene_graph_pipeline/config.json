@@ -9,13 +9,16 @@
     "max_tokens_graph": 4000,
     "retries": 2,
     "temperature": 0.0,
-    "entity_prompt_version": "unified_goal_roles_noun_only_v6",
+    "entity_prompt_version": "unified_qwen_bbox_grounding_v7",
     "graph_prompt_version": "unified_split_state_action_v8"
   },
   "sam3": {
     "checkpoint": "/models/sam3.pt",
     "source_revision": "86ed77094094e5cabb16b0414ec60c5ba9ce0a0f",
-    "checkpoint_sha256": "9999e2341ceef5e136daa386eecb55cb414446a00ac2b55eb2dfd2f7c3cf8c9e"
+    "checkpoint_sha256": "9999e2341ceef5e136daa386eecb55cb414446a00ac2b55eb2dfd2f7c3cf8c9e",
+    "prompt_mode": "qwen_bbox",
+    "box_coordinate_scale": 1000,
+    "box_propagation": "independent_bidirectional"
   },
   "da3": {
     "model_name": "DA3NESTED-GIANT-LARGE-1.1",
@@ -25,7 +28,7 @@
     "checkpoint_sha256": "8ebe871a022ed58d2fc8fdfb2ebdb31d57b60fe39611c849095851a7b7c6020c"
   },
   "render": {
-    "version": "sam_prompt_legend_boundaries_v2",
+    "version": "qwen_box_legend_boundaries_v3",
     "min_width": 640,
     "mask_alpha": 0.48,
     "boundary_width": 2
