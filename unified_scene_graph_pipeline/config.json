@@ -16,7 +16,8 @@
     "entity_reflection_enabled": true,
     "entity_reflection_prompt_version": "refer_agent_style_all_frame_reflection_v1",
     "tracking_prompt_version": "unified_five_frame_bbox_tracker_v2",
-    "graph_prompt_version": "unified_split_state_action_v8"
+    "graph_mode": "verified_event_timeline",
+    "graph_prompt_version": "verified_persistent_event_timeline_v1"
   },
   "sam3": {
     "checkpoint": "/models/sam3.pt",

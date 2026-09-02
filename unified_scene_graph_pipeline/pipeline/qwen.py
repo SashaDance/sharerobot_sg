@@ -629,6 +629,173 @@ def validate_action_document(value: dict[str, Any], requested: list[int], task: 
     return rows
 
 
+def event_graph_prompt(goal: str, task: dict[str, Any], frame_indices: list[int], config: dict[str, Any]) -> str:
+    entity_ids, _, context = graph_context(goal, task, frame_indices)
+    return f"""Infer one compact, temporally persistent event graph for this complete robot-manipulation video.
+{context}
+Return exactly this compact JSON shape:
+{{
+ "initial_state":[[subject,relation,object],...],
+ "events":[[start_frame,end_frame,actor,action,object_or_null],...],
+ "transitions":[[frame_index,[[state_edge_to_remove],...],[[state_edge_to_add],...]],...],
+ "final_state":[[subject,relation,object],...]
+}}
+Valid entity IDs: {entity_ids}.
+Allowed state relations: {config['ontology']['states']}.
+Allowed actions: {config['ontology']['actions']}.
+
+State edge rules are strict. For on, inside, holding, touching, part_of, and attached_to, subject and object must both be IDs from the valid entity list; object must never be null. For open and closed only, use [subject,relation,null]. Never mention a role or ID that is absent from the valid entity list.
+
+State is persistent: initial_state is true at the first requested output frame and remains true until an explicit transition removes it. A transition is applied at its frame before that frame's graph is emitted. final_state must exactly equal the state obtained after replaying all transitions. Event intervals are inclusive and must stay within the requested frames. Use the complete ordered sequence to identify approach, grasp, transport, placement, release, push, pour, insert, or stack intervals. Keep an empty list when evidence is absent; do not complete the planned task merely because the goal requests it. Do not keep an object on its initial support after it is visibly lifted. Do not add a target relation until visible target contact or containment occurs.
+
+Every edge and event must be visually supported by RGB and the entity masks. Do not output per-frame rows, confidence, reasoning, coordinates, descriptions, planning steps, or extra fields."""
+
+
+def event_graph_verification_prompt(
+    goal: str,
+    task: dict[str, Any],
+    frame_indices: list[int],
+    config: dict[str, Any],
+    draft: dict[str, Any],
+) -> str:
+    entity_ids, _, context = graph_context(goal, task, frame_indices)
+    return f"""You verify a compact event graph against every frame of a robot-manipulation video.
+{context}
+Draft event graph: {json.dumps(draft, ensure_ascii=False)}
+
+Return a corrected graph with exactly the same four keys and compact row formats as the draft: initial_state, events, transitions, final_state. Valid entity IDs: {entity_ids}. Allowed states: {config['ontology']['states']}. Allowed actions: {config['ontology']['actions']}.
+
+For on, inside, holding, touching, part_of, and attached_to, subject and object must both be IDs from the valid entity list and object must not be null. Only open and closed use a null object. Remove every edge that mentions an absent role or ID.
+
+Reject unsupported relations/actions instead of guessing. Check object identity, first-frame support, grasp/lift timing, whether the object actually moves with the robot, target contact/containment, and the final frame. Enforce persistent state: replaying transitions from initial_state must produce final_state exactly. A transition applies at its frame; event intervals are inclusive. Prefer a short supported interval over an action spanning unrelated frames. Do not infer task completion from the planning goal alone.
+
+Output JSON only. Do not output confidence, reasoning, coordinates, descriptions, feedback, planning steps, or extra fields."""
+
+
+def _validate_event_state_edges(
+    packed_edges: Any,
+    entity_ids: set[str],
+    states: set[str],
+) -> list[list[Any]]:
+    if not isinstance(packed_edges, list):
+        raise ValueError("Event state edges must be a list")
+    normalized = []
+    for edge in packed_edges:
+        if not isinstance(edge, list) or len(edge) != 3:
+            raise ValueError(f"Invalid compact event state edge {edge}")
+        subject, relation, obj = edge
+        unary_valid = relation in {"open", "closed"} and obj is None
+        binary_valid = obj in entity_ids
+        if subject not in entity_ids or relation not in states or not (unary_valid or binary_valid):
+            raise ValueError(f"Invalid event state edge {edge}")
+        row = [subject, relation, obj]
+        if row not in normalized:
+            normalized.append(row)
+    return normalized
+
+
+def validate_event_graph_document(
+    value: dict[str, Any],
+    requested: list[int],
+    task: dict[str, Any],
+    config: dict[str, Any],
+    expected_initial_state: list[list[Any]] | None = None,
+) -> dict[str, Any]:
+    required = {"initial_state", "events", "transitions", "final_state"}
+    if set(value) != required:
+        raise ValueError(f"Expected exactly event graph keys {sorted(required)}")
+    entity_ids = {entity["entity_id"] for entity in task["entities"]}
+    if not requested or requested != list(range(requested[0], requested[-1] + 1)):
+        raise ValueError("Event graph requested frames must be a non-empty contiguous range")
+    first_frame, last_frame = requested[0], requested[-1]
+    states = set(config["ontology"]["states"])
+    actions = set(config["ontology"]["actions"])
+    initial = _validate_event_state_edges(value["initial_state"], entity_ids, states)
+    final = _validate_event_state_edges(value["final_state"], entity_ids, states)
+    if expected_initial_state is not None and {tuple(edge) for edge in initial} != {
+        tuple(edge) for edge in expected_initial_state
+    }:
+        raise ValueError("initial_state does not equal the prior chunk's verified final_state")
+    if not isinstance(value["events"], list):
+        raise ValueError("events must be a list")
+    events = []
+    for event in value["events"]:
+        if not isinstance(event, list) or len(event) != 5:
+            raise ValueError(f"Invalid compact event {event}")
+        start, end, actor, action, obj = event
+        if (
+            not isinstance(start, int) or isinstance(start, bool)
+            or not isinstance(end, int) or isinstance(end, bool)
+            or not (first_frame <= start <= end <= last_frame)
+            or actor not in entity_ids or action not in actions
+            or (obj is not None and obj not in entity_ids)
+        ):
+            raise ValueError(f"Invalid compact event {event}")
+        row = [start, end, actor, action, obj]
+        if row not in events:
+            events.append(row)
+    if not isinstance(value["transitions"], list):
+        raise ValueError("transitions must be a list")
+    transitions = []
+    seen_frames = set()
+    for transition in value["transitions"]:
+        if not isinstance(transition, list) or len(transition) != 3:
+            raise ValueError(f"Invalid transition {transition}")
+        frame_index, removed, added = transition
+        if (
+            not isinstance(frame_index, int) or isinstance(frame_index, bool)
+            or not (first_frame < frame_index <= last_frame) or frame_index in seen_frames
+        ):
+            raise ValueError(f"Invalid or duplicate transition frame {frame_index}")
+        seen_frames.add(frame_index)
+        transitions.append([
+            frame_index,
+            _validate_event_state_edges(removed, entity_ids, states),
+            _validate_event_state_edges(added, entity_ids, states),
+        ])
+    transitions.sort(key=lambda row: row[0])
+    state = {tuple(edge) for edge in initial}
+    for frame_index, removed, added in transitions:
+        missing = {tuple(edge) for edge in removed} - state
+        if missing:
+            raise ValueError(f"Transition {frame_index} removes absent state edges {sorted(missing)}")
+        state.difference_update(tuple(edge) for edge in removed)
+        state.update(tuple(edge) for edge in added)
+    if state != {tuple(edge) for edge in final}:
+        raise ValueError("final_state does not equal the replayed transition state")
+    return {
+        "initial_state": initial,
+        "events": sorted(events, key=lambda row: (row[0], row[1], row[3])),
+        "transitions": transitions,
+        "final_state": final,
+    }
+
+
+def expand_event_graph(document: dict[str, Any], frame_indices: list[int]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    transitions = {row[0]: row[1:] for row in document["transitions"]}
+    state = {tuple(edge) for edge in document["initial_state"]}
+    state_rows = []
+    action_rows = []
+    for frame_index in frame_indices:
+        if frame_index in transitions:
+            removed, added = transitions[frame_index]
+            state.difference_update(tuple(edge) for edge in removed)
+            state.update(tuple(edge) for edge in added)
+        state_rows.append({
+            "frame_index": frame_index,
+            "state_edges": [
+                dict(zip(("subject", "relation", "object"), edge))
+                for edge in sorted(state, key=lambda row: (row[0], row[1], str(row[2])))
+            ],
+        })
+        actions = []
+        for start, end, actor, action, obj in document["events"]:
+            if start <= frame_index <= end:
+                actions.append({"actor": actor, "action": action, "object": obj})
+        action_rows.append({"frame_index": frame_index, "actions": actions})
+    return state_rows, action_rows
+
+
 def infer_graph(output: Path, config: dict[str, Any], overwrite: bool = False) -> dict[str, Any]:
     dependencies = [output / "input.json", output / "task_spec.json", output / "tracks.json", output / "masks"]
     fingerprint = stage_fingerprint(config, dependencies, "graph")
@@ -643,25 +810,70 @@ def infer_graph(output: Path, config: dict[str, Any], overwrite: bool = False) -
     action_rows: list[dict[str, Any]] = []
     state_audit = []
     action_audit = []
-    for current, previous in contextual_chunks(indices, int(config["qwen"]["frames_per_request"])):
-        # A previous RGB+mask image provides visual boundary context only; it is explicitly excluded from output.
-        visual = ([previous] if previous is not None else []) + current
-        state_prompt = state_graph_prompt(context["planning_goal"], task, current, config) + (f"\nFrame {previous} is context only and MUST NOT appear in output." if previous is not None else "")
-        chunk_states, attempts = client.request(
-            graph_content(output, state_prompt, task, visual),
-            int(config["qwen"]["max_tokens_graph"]),
-            lambda value, requested=current: validate_state_document(value, requested, task, config),
-        )
-        state_rows.extend(chunk_states)
-        state_audit.append({"output_frames": current, "visual_frames": visual, "attempts": attempts})
-        action_prompt = action_graph_prompt(context["planning_goal"], task, current, config) + (f"\nFrame {previous} is context only and MUST NOT appear in output." if previous is not None else "")
-        chunk_actions, attempts = client.request(
-            graph_content(output, action_prompt, task, visual),
-            int(config["qwen"]["max_tokens_graph"]),
-            lambda value, requested=current: validate_action_document(value, requested, task, config),
-        )
-        action_rows.extend(chunk_actions)
-        action_audit.append({"output_frames": current, "visual_frames": visual, "attempts": attempts})
+    event_audit = []
+    graph_mode = config["qwen"].get("graph_mode", "independent_split")
+    if graph_mode == "verified_event_timeline":
+        prior_final_state = None
+        for current, previous in contextual_chunks(indices, int(config["qwen"]["frames_per_request"])):
+            visual = ([previous] if previous is not None else []) + current
+            prompt = event_graph_prompt(context["planning_goal"], task, current, config)
+            if previous is not None:
+                prompt += f"\nFrame {previous} is visual context only and MUST NOT appear in event intervals or transitions."
+                prompt += "\nVerified persistent state immediately before this chunk: " + json.dumps(prior_final_state, ensure_ascii=False)
+            draft, draft_attempts = client.request(
+                graph_content(output, prompt, task, visual),
+                int(config["qwen"]["max_tokens_graph"]),
+                lambda value, requested=current, expected=prior_final_state: validate_event_graph_document(
+                    value, requested, task, config, expected,
+                ),
+            )
+            verify_prompt = event_graph_verification_prompt(
+                context["planning_goal"], task, current, config, draft,
+            )
+            if previous is not None:
+                verify_prompt += f"\nFrame {previous} is visual context only and MUST NOT appear in event intervals or transitions."
+                verify_prompt += "\nVerified persistent state immediately before this chunk: " + json.dumps(prior_final_state, ensure_ascii=False)
+            verified, verifier_attempts = client.request(
+                graph_content(output, verify_prompt, task, visual),
+                int(config["qwen"]["max_tokens_graph"]),
+                lambda value, requested=current, expected=prior_final_state: validate_event_graph_document(
+                    value, requested, task, config, expected,
+                ),
+            )
+            chunk_states, chunk_actions = expand_event_graph(verified, current)
+            state_rows.extend(chunk_states)
+            action_rows.extend(chunk_actions)
+            prior_final_state = verified["final_state"]
+            event_audit.append({
+                "output_frames": current,
+                "visual_frames": visual,
+                "draft": draft,
+                "verified": verified,
+                "draft_attempts": draft_attempts,
+                "verifier_attempts": verifier_attempts,
+            })
+    elif graph_mode == "independent_split":
+        for current, previous in contextual_chunks(indices, int(config["qwen"]["frames_per_request"])):
+            # A previous RGB+mask image provides visual boundary context only; it is explicitly excluded from output.
+            visual = ([previous] if previous is not None else []) + current
+            state_prompt = state_graph_prompt(context["planning_goal"], task, current, config) + (f"\nFrame {previous} is context only and MUST NOT appear in output." if previous is not None else "")
+            chunk_states, attempts = client.request(
+                graph_content(output, state_prompt, task, visual),
+                int(config["qwen"]["max_tokens_graph"]),
+                lambda value, requested=current: validate_state_document(value, requested, task, config),
+            )
+            state_rows.extend(chunk_states)
+            state_audit.append({"output_frames": current, "visual_frames": visual, "attempts": attempts})
+            action_prompt = action_graph_prompt(context["planning_goal"], task, current, config) + (f"\nFrame {previous} is context only and MUST NOT appear in output." if previous is not None else "")
+            chunk_actions, attempts = client.request(
+                graph_content(output, action_prompt, task, visual),
+                int(config["qwen"]["max_tokens_graph"]),
+                lambda value, requested=current: validate_action_document(value, requested, task, config),
+            )
+            action_rows.extend(chunk_actions)
+            action_audit.append({"output_frames": current, "visual_frames": visual, "attempts": attempts})
+    else:
+        raise ValueError(f"Unknown Qwen graph mode: {graph_mode}")
     state_by_index = {row["frame_index"]: row["state_edges"] for row in state_rows}
     action_by_index = {row["frame_index"]: row["actions"] for row in action_rows}
     frames = []
@@ -676,7 +888,7 @@ def infer_graph(output: Path, config: dict[str, Any], overwrite: bool = False) -
         "frame_count": len(frames),
         "frames": frames,
         "ontology": config["ontology"],
-        "provenance": {"model": config["qwen"]["model"], "model_revision": config["qwen"]["revision"], "prompt_version": config["qwen"]["graph_prompt_version"], "config_hash": config_hash(config), "per_frame_inference": True, "split_state_action_inference": True},
+        "provenance": {"model": config["qwen"]["model"], "model_revision": config["qwen"]["revision"], "prompt_version": config["qwen"]["graph_prompt_version"], "config_hash": config_hash(config), "graph_mode": graph_mode, "per_frame_inference": graph_mode == "independent_split", "split_state_action_inference": graph_mode == "independent_split"},
     }
     write_json_atomic(target, result)
     write_json_atomic(output / "qwen_graph_audit.json", {
@@ -684,6 +896,12 @@ def infer_graph(output: Path, config: dict[str, Any], overwrite: bool = False) -
         "action_prompt_template": action_graph_prompt(context["planning_goal"], task, ["<output_frame_indices>"], config),
         "state_chunks": state_audit,
         "action_chunks": action_audit,
+        "event_prompt_template": event_graph_prompt(context["planning_goal"], task, ["<output_frame_indices>"], config),
+        "event_verifier_prompt_template": event_graph_verification_prompt(
+            context["planning_goal"], task, ["<output_frame_indices>"], config,
+            {"initial_state": [], "events": [], "transitions": [], "final_state": []},
+        ),
+        "event_chunks": event_audit,
     })
     complete_stage(output, "graph", fingerprint, {"frame_count": len(frames)})
     update_run_report(output, "graph", "success", {"frame_count": len(frames)})

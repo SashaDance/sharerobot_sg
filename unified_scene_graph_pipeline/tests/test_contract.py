@@ -16,9 +16,11 @@ from prepare import prepare  # noqa: E402
 from qwen import (  # noqa: E402
     contextual_chunks,
     entity_reflection_prompt,
+    expand_event_graph,
     tracking_overlay_frame,
     validate_action_document,
     validate_entity_document,
+    validate_event_graph_document,
     validate_state_document,
     validate_tracking_document,
 )
@@ -185,6 +187,64 @@ def test_graph_schema_accepts_honest_empty_or_unchanged_chunks() -> None:
         {"frame_index": 0, "actions": []},
         {"frame_index": 1, "actions": []},
     ]
+
+
+def test_event_graph_replays_persistent_state_and_action_intervals() -> None:
+    task = {
+        "entities": [{"entity_id": "robot"}, {"entity_id": "manipulated_object"}, {"entity_id": "target"}],
+    }
+    config = {"ontology": {"states": ["on", "holding"], "actions": ["grab", "move", "place"]}}
+    document = {
+        "initial_state": [["robot", "holding", "manipulated_object"]],
+        "events": [[3, 4, "robot", "move", "manipulated_object"], [5, 5, "robot", "place", "manipulated_object"]],
+        "transitions": [[5, [["robot", "holding", "manipulated_object"]], [["manipulated_object", "on", "target"]]]],
+        "final_state": [["manipulated_object", "on", "target"]],
+    }
+    verified = validate_event_graph_document(document, [3, 4, 5], task, config)
+    states, actions = expand_event_graph(verified, [3, 4, 5])
+    assert states[0]["state_edges"] == [{"subject": "robot", "relation": "holding", "object": "manipulated_object"}]
+    assert states[-1]["state_edges"] == [{"subject": "manipulated_object", "relation": "on", "object": "target"}]
+    assert [item["actions"][0]["action"] for item in actions] == ["move", "move", "place"]
+
+
+def test_event_graph_rejects_inconsistent_final_state() -> None:
+    task = {"entities": [{"entity_id": "robot"}, {"entity_id": "manipulated_object"}]}
+    config = {"ontology": {"states": ["holding"], "actions": ["grab"]}}
+    document = {
+        "initial_state": [],
+        "events": [],
+        "transitions": [],
+        "final_state": [["robot", "holding", "manipulated_object"]],
+    }
+    try:
+        validate_event_graph_document(document, [0, 1], task, config)
+    except ValueError as error:
+        assert "final_state" in str(error)
+    else:
+        raise AssertionError("inconsistent final state accepted")
+
+
+def test_event_graph_enforces_state_continuity_between_chunks() -> None:
+    task = {"entities": [{"entity_id": "robot"}, {"entity_id": "manipulated_object"}]}
+    config = {"ontology": {"states": ["holding"], "actions": ["move"]}}
+    document = {
+        "initial_state": [],
+        "events": [],
+        "transitions": [],
+        "final_state": [],
+    }
+    try:
+        validate_event_graph_document(
+            document,
+            [30, 31],
+            task,
+            config,
+            [["robot", "holding", "manipulated_object"]],
+        )
+    except ValueError as error:
+        assert "prior chunk" in str(error)
+    else:
+        raise AssertionError("cross-chunk state discontinuity accepted")
 
 
 def test_render_has_prompt_legend_and_strong_mask_boundary(tmp_path: Path) -> None:
