@@ -17,6 +17,12 @@
     "full_100_scene_run_launched": false,
     "reason": "Several scenes still have wrong or missing manipulated-object/target masks or incoherent relation/action timing. Scaling to 100 scenes would measure known pipeline failures rather than validate a stable configuration."
   },
+  "semantic_outcome_count": {
+    "fully_successful": 2,
+    "partially_successful": 5,
+    "unsuccessful": 4,
+    "total": 11
+  },
   "scenes": [
     {
       "relative_path": "9_asu_table_top_converted_externally_to_rlds/episode_103",

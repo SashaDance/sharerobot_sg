@@ -52,7 +52,7 @@ The scripts do not contain a full-1,000 run command. The 100-scene validation mu
 
 ## Current pilot result
 
-Configuration `unified_goal_roles_v3` + `unified_all_frames_compact_v7` completed technical validation for all 11 pilot scenes. The identical generated-video path also passed with all 117 input frames, 117 graph entries, 117 finite DA3 depth/pose results, and 117 trajectory entries. Manual visual review did not pass the quality gate: 2/11 scenes passed and 9/11 exposed wrong/missing tracks or relation/action errors. Consequently, `manifests/validation_100.json` is prepared but has not been launched. See `reports/pilot_v7_failure_summary.json` for the per-scene review and recommended global revisions.
+Configuration `unified_goal_roles_role_specific_v5` + `unified_split_state_action_v8` completed technical validation for all 11 pilot scenes. Manual semantic outcome: **1 fully successful, 4 partially successful, and 6 unsuccessful**. The split graph pass improves Bridge, EDAN, and UCSD, but regresses FMB and the clamp scene; RoboSet still has an incorrect target role. Consequently, `manifests/validation_100.json` is prepared but has not been launched. See `reports/pilot_v8_failure_summary.json` for the current per-scene assessment.
 
 ## Public output tree
 
