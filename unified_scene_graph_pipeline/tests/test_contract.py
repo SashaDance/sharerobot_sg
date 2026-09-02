@@ -13,7 +13,12 @@ sys.path.insert(0, str(PIPELINE))
 
 from common import ensure_no_confidence, image_paths  # noqa: E402
 from prepare import prepare  # noqa: E402
-from qwen import contextual_chunks, validate_entity_document, validate_graph_document  # noqa: E402
+from qwen import (  # noqa: E402
+    contextual_chunks,
+    validate_action_document,
+    validate_entity_document,
+    validate_state_document,
+)
 from render import ROLE_COLORS, _draw_frame  # noqa: E402
 
 
@@ -59,12 +64,13 @@ def test_entity_schema_rejects_extra_roles_and_confidence() -> None:
 def test_graph_schema_requires_requested_frames_and_valid_references() -> None:
     task = {"entities": [{"entity_id": "robot"}, {"entity_id": "manipulated_object"}]}
     config = {"ontology": {"states": ["holding"], "actions": ["grab"]}}
-    value = {"frames": [[4, [["robot", "holding", "manipulated_object"]], [["robot", "grab", "manipulated_object"]]]]}
-    expanded = validate_graph_document(value, [4], task, config)
-    assert expanded[0]["state_edges"][0]["relation"] == "holding"
-    value["frames"][0][1][0][2] = "unknown"
+    states = {"frames": [[4, [["robot", "holding", "manipulated_object"]]]]}
+    actions = {"frames": [[4, [["robot", "grab", "manipulated_object"]]]]}
+    assert validate_state_document(states, [4], task, config)[0]["state_edges"][0]["relation"] == "holding"
+    assert validate_action_document(actions, [4], task, config)[0]["actions"][0]["action"] == "grab"
+    states["frames"][0][1][0][2] = "unknown"
     try:
-        validate_graph_document(value, [4], task, config)
+        validate_state_document(states, [4], task, config)
         raise AssertionError("invalid reference accepted")
     except ValueError:
         pass
@@ -83,10 +89,14 @@ def test_graph_schema_accepts_honest_empty_or_unchanged_chunks() -> None:
         "task_actions": ["move"],
     }
     config = {"ontology": {"states": ["holding"], "actions": ["move"]}}
-    empty = {"frames": [[0, [], []], [1, [], []]]}
-    assert validate_graph_document(empty, [0, 1], task, config) == [
-        {"frame_index": 0, "state_edges": [], "actions": []},
-        {"frame_index": 1, "state_edges": [], "actions": []},
+    empty = {"frames": [[0, []], [1, []]]}
+    assert validate_state_document(empty, [0, 1], task, config) == [
+        {"frame_index": 0, "state_edges": []},
+        {"frame_index": 1, "state_edges": []},
+    ]
+    assert validate_action_document(empty, [0, 1], task, config) == [
+        {"frame_index": 0, "actions": []},
+        {"frame_index": 1, "actions": []},
     ]
 
 

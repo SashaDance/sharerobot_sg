@@ -238,7 +238,7 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
     return result
 
 
-def graph_prompt(goal: str, task: dict[str, Any], frame_indices: list[int], config: dict[str, Any]) -> str:
+def graph_context(goal: str, task: dict[str, Any], frame_indices: list[int]) -> tuple[list[str], dict[str, dict[str, str]], str]:
     entity_ids = [entity["entity_id"] for entity in task["entities"]]
     mask_legend = {
         entity["entity_id"]: {
@@ -247,18 +247,33 @@ def graph_prompt(goal: str, task: dict[str, Any], frame_indices: list[int], conf
         }
         for entity in task["entities"]
     }
-    return f"""Infer a scene graph independently for every supplied robot-manipulation frame.
-Planning goal: {goal}
+    context = f"""Planning goal: {goal}
 Entities: {json.dumps(task['entities'], ensure_ascii=False)}
 Frames to output: {frame_indices}
-Each image is the RGB frame with transparent mask overlays. Mask color legend: {json.dumps(mask_legend)}. Use the image itself, masks, goal, and role specification only. Do not propagate a previous answer.
-Use this compact JSON to avoid repeating keys: {{"frames":[[frame_index,[[subject,relation,object]],[[actor,action,object_or_null]]], ...]}}.
+Each image is the RGB frame with transparent mask overlays. Mask color legend: {json.dumps(mask_legend)}. Use the image itself, masks, goal, and role specification only."""
+    return entity_ids, mask_legend, context
+
+
+def state_graph_prompt(goal: str, task: dict[str, Any], frame_indices: list[int], config: dict[str, Any]) -> str:
+    entity_ids, _, context = graph_context(goal, task, frame_indices)
+    return f"""Infer visible state relations independently for every supplied robot-manipulation frame.
+{context}
+Return compact JSON only: {{"frames":[[frame_index,[[subject,relation,object]]], ...]}}.
 Return one item for each requested frame, and no others. Valid entity IDs: {entity_ids}.
 Allowed state relations: {config['ontology']['states']}.
+State edges describe only what is visibly true in that frame. Common examples are ["manipulated_object","on","initial_support"], ["robot","holding","manipulated_object"], and ["manipulated_object","inside","target"]. Pay particular attention to the first and final frames: a completed manipulation normally removes the initial-support relation and adds the target relation. A mask can be absent because of occlusion, so use RGB evidence as well as overlays, but never invent an entity.
+Infer every requested frame directly rather than copying the prior frame. Edge object may be null only for unary open or closed. Omit unsupported edges. Do not output actions, confidence, reasoning, coordinates, descriptions, planning steps, or extra fields."""
+
+
+def action_graph_prompt(goal: str, task: dict[str, Any], frame_indices: list[int], config: dict[str, Any]) -> str:
+    entity_ids, _, context = graph_context(goal, task, frame_indices)
+    return f"""Infer temporally supported robot actions for every supplied robot-manipulation frame.
+{context}
+Return compact JSON only: {{"frames":[[frame_index,[[actor,action,object_or_null]]], ...]}}.
+Return one item for each requested frame, and no others. Valid entity IDs: {entity_ids}.
 Allowed actions: {config['ontology']['actions']}.
-State edges describe what is visibly true in that frame. Common examples are ["manipulated_object","on","initial_support"], ["robot","holding","manipulated_object"], and ["manipulated_object","inside","target"]. Distinguish initial_support from target and inspect the final RGB frame for the goal relation instead of assuming the initial support remains unchanged. Actions describe the active interaction at that instant; many frames may have no action. Emit actions only when the interaction is visually supported, including when the generated video does not complete the planning goal.
-Use the full ordered visual sequence to recognize action timing, but decide and output each requested frame directly from its RGB and mask overlay rather than copying or propagating an earlier graph. The first, interaction, and final phases should normally differ for a completed manipulation.
-Edges may refer only to valid IDs. State-edge object may be null only for the unary open or closed state. Omit any unsupported edge or action; honest empty or unchanged frames are valid. No confidence, reasoning, coordinates, descriptions, planning steps, or extra fields."""
+Use the complete ordered sequence to recognize transitions and timing. reach_for occurs only during approach; grab at grasp closure; lift when the object leaves its support; move during transport while held; place at target contact; release when the gripper lets go. Use push, pour, open, close, insert, or stack only when the corresponding motion is visible. Many frames may have no active action, and an unsuccessful video may never complete the planned action.
+Do not infer static state relations in this pass. Omit unsupported actions. Do not output confidence, reasoning, coordinates, descriptions, planning steps, or extra fields."""
 
 
 def overlay_frame(output: Path, task: dict[str, Any], frame_index: int) -> bytes:
@@ -288,8 +303,8 @@ def overlay_frame(output: Path, task: dict[str, Any], frame_index: int) -> bytes
     return stream.getvalue()
 
 
-def graph_content(output: Path, goal: str, task: dict[str, Any], indices: list[int], config: dict[str, Any]) -> list[dict[str, Any]]:
-    content: list[dict[str, Any]] = [{"type": "text", "text": graph_prompt(goal, task, indices, config)}]
+def graph_content(output: Path, prompt: str, task: dict[str, Any], indices: list[int]) -> list[dict[str, Any]]:
+    content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
     for index in indices:
         encoded = base64.b64encode(overlay_frame(output, task, index)).decode("ascii")
         content.extend([
@@ -299,21 +314,20 @@ def graph_content(output: Path, goal: str, task: dict[str, Any], indices: list[i
     return content
 
 
-def validate_graph_document(value: dict[str, Any], requested: list[int], task: dict[str, Any], config: dict[str, Any]) -> list[dict[str, Any]]:
+def validate_state_document(value: dict[str, Any], requested: list[int], task: dict[str, Any], config: dict[str, Any]) -> list[dict[str, Any]]:
     if set(value) != {"frames"} or not isinstance(value["frames"], list):
         raise ValueError("Expected only frames list")
     packed_rows = value["frames"]
-    if any(not isinstance(row, list) or len(row) != 3 for row in packed_rows):
-        raise ValueError("Each compact frame must be [frame_index, state_edges, actions]")
+    if any(not isinstance(row, list) or len(row) != 2 for row in packed_rows):
+        raise ValueError("Each state frame must be [frame_index, state_edges]")
     if sorted(row[0] for row in packed_rows) != sorted(requested) or len(packed_rows) != len(requested):
         raise ValueError(f"Expected exactly frame indices {requested}")
     entity_ids = {entity["entity_id"] for entity in task["entities"]}
     states = set(config["ontology"]["states"])
-    actions = set(config["ontology"]["actions"])
     rows = []
-    for frame_index, packed_edges, packed_actions in packed_rows:
-        if not isinstance(packed_edges, list) or not isinstance(packed_actions, list):
-            raise ValueError("Edges/actions must be lists")
+    for frame_index, packed_edges in packed_rows:
+        if not isinstance(packed_edges, list):
+            raise ValueError("State edges must be a list")
         state_edges = []
         for packed_edge in packed_edges:
             if not isinstance(packed_edge, list) or len(packed_edge) != 3:
@@ -324,6 +338,24 @@ def validate_graph_document(value: dict[str, Any], requested: list[int], task: d
             if edge["subject"] not in entity_ids or edge["relation"] not in states or not (unary_valid or binary_valid):
                 raise ValueError(f"Invalid state edge {edge}")
             state_edges.append(edge)
+        rows.append({"frame_index": frame_index, "state_edges": state_edges})
+    return rows
+
+
+def validate_action_document(value: dict[str, Any], requested: list[int], task: dict[str, Any], config: dict[str, Any]) -> list[dict[str, Any]]:
+    if set(value) != {"frames"} or not isinstance(value["frames"], list):
+        raise ValueError("Expected only frames list")
+    packed_rows = value["frames"]
+    if any(not isinstance(row, list) or len(row) != 2 for row in packed_rows):
+        raise ValueError("Each action frame must be [frame_index, actions]")
+    if sorted(row[0] for row in packed_rows) != sorted(requested) or len(packed_rows) != len(requested):
+        raise ValueError(f"Expected exactly frame indices {requested}")
+    entity_ids = {entity["entity_id"] for entity in task["entities"]}
+    actions = set(config["ontology"]["actions"])
+    rows = []
+    for frame_index, packed_actions in packed_rows:
+        if not isinstance(packed_actions, list):
+            raise ValueError("Actions must be a list")
         expanded_actions = []
         for packed_action in packed_actions:
             if not isinstance(packed_action, list) or len(packed_action) != 3:
@@ -332,7 +364,7 @@ def validate_graph_document(value: dict[str, Any], requested: list[int], task: d
             if action["actor"] not in entity_ids or action["action"] not in actions or (action["object"] is not None and action["object"] not in entity_ids):
                 raise ValueError(f"Invalid action {action}")
             expanded_actions.append(action)
-        rows.append({"frame_index": frame_index, "state_edges": state_edges, "actions": expanded_actions})
+        rows.append({"frame_index": frame_index, "actions": expanded_actions})
     return rows
 
 
@@ -346,39 +378,51 @@ def infer_graph(output: Path, config: dict[str, Any], overwrite: bool = False) -
     task = read_json(output / "task_spec.json")
     client = QwenClient(config)
     indices = list(range(int(context["frame_count"])))
-    rows: list[dict[str, Any]] = []
-    audit = []
+    state_rows: list[dict[str, Any]] = []
+    action_rows: list[dict[str, Any]] = []
+    state_audit = []
+    action_audit = []
     for current, previous in contextual_chunks(indices, int(config["qwen"]["frames_per_request"])):
         # A previous RGB+mask image provides visual boundary context only; it is explicitly excluded from output.
         visual = ([previous] if previous is not None else []) + current
-        content = graph_content(output, context["planning_goal"], task, visual, config)
-        content[0]["text"] = graph_prompt(context["planning_goal"], task, current, config) + (f"\nFrame {previous} is context only and MUST NOT appear in output." if previous is not None else "")
-        chunk_rows, attempts = client.request(
-            content,
+        state_prompt = state_graph_prompt(context["planning_goal"], task, current, config) + (f"\nFrame {previous} is context only and MUST NOT appear in output." if previous is not None else "")
+        chunk_states, attempts = client.request(
+            graph_content(output, state_prompt, task, visual),
             int(config["qwen"]["max_tokens_graph"]),
-            lambda value, requested=current: validate_graph_document(value, requested, task, config),
+            lambda value, requested=current: validate_state_document(value, requested, task, config),
         )
-        rows.extend(chunk_rows)
-        audit.append({"output_frames": current, "visual_frames": visual, "attempts": attempts})
-    row_by_index = {row["frame_index"]: row for row in rows}
+        state_rows.extend(chunk_states)
+        state_audit.append({"output_frames": current, "visual_frames": visual, "attempts": attempts})
+        action_prompt = action_graph_prompt(context["planning_goal"], task, current, config) + (f"\nFrame {previous} is context only and MUST NOT appear in output." if previous is not None else "")
+        chunk_actions, attempts = client.request(
+            graph_content(output, action_prompt, task, visual),
+            int(config["qwen"]["max_tokens_graph"]),
+            lambda value, requested=current: validate_action_document(value, requested, task, config),
+        )
+        action_rows.extend(chunk_actions)
+        action_audit.append({"output_frames": current, "visual_frames": visual, "attempts": attempts})
+    state_by_index = {row["frame_index"]: row["state_edges"] for row in state_rows}
+    action_by_index = {row["frame_index"]: row["actions"] for row in action_rows}
     frames = []
     for index in indices:
         nodes = []
         for entity in task["entities"]:
             geometry = mask_geometry(output / "masks" / entity["entity_id"] / f"frame_{index:06d}.png")
             nodes.append({"entity_id": entity["entity_id"], "role": entity["role"], "canonical_name": entity["canonical_name"], **geometry})
-        frames.append({"frame_index": index, "nodes": nodes, **{key: row_by_index[index][key] for key in ("state_edges", "actions")}})
+        frames.append({"frame_index": index, "nodes": nodes, "state_edges": state_by_index[index], "actions": action_by_index[index]})
     result = {
         "schema_version": "unified_scene_graph_v1",
         "frame_count": len(frames),
         "frames": frames,
         "ontology": config["ontology"],
-        "provenance": {"model": config["qwen"]["model"], "model_revision": config["qwen"]["revision"], "prompt_version": config["qwen"]["graph_prompt_version"], "config_hash": config_hash(config), "per_frame_inference": True},
+        "provenance": {"model": config["qwen"]["model"], "model_revision": config["qwen"]["revision"], "prompt_version": config["qwen"]["graph_prompt_version"], "config_hash": config_hash(config), "per_frame_inference": True, "split_state_action_inference": True},
     }
     write_json_atomic(target, result)
     write_json_atomic(output / "qwen_graph_audit.json", {
-        "prompt_template": graph_prompt(context["planning_goal"], task, ["<output_frame_indices>"], config),
-        "chunks": audit,
+        "state_prompt_template": state_graph_prompt(context["planning_goal"], task, ["<output_frame_indices>"], config),
+        "action_prompt_template": action_graph_prompt(context["planning_goal"], task, ["<output_frame_indices>"], config),
+        "state_chunks": state_audit,
+        "action_chunks": action_audit,
     })
     complete_stage(output, "graph", fingerprint, {"frame_count": len(frames)})
     update_run_report(output, "graph", "success", {"frame_count": len(frames)})

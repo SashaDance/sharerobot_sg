@@ -10,7 +10,7 @@
     "retries": 2,
     "temperature": 0.0,
     "entity_prompt_version": "unified_goal_roles_role_specific_v5",
-    "graph_prompt_version": "unified_all_frames_compact_v7"
+    "graph_prompt_version": "unified_split_state_action_v8"
   },
   "sam3": {
     "checkpoint": "/models/sam3.pt",
