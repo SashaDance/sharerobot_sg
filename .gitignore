@@ -1,0 +1,15 @@
+.env
+.pytest_cache/
+*.pyc
+__pycache__/
+
+sam3.pt
+data/
+paper/
+report/
+legacy_code/
+experiments/
+
+unified_scene_graph_pipeline/pilot_visualizations/
+unified_scene_graph_pipeline/runs/
+unified_scene_graph_pipeline/models/

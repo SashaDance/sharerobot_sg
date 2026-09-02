@@ -1,0 +1,1838 @@
+{
+  "schema_version": "unified_sgg_selection_v1",
+  "name": "validation_100_stratified",
+  "seed": 20260901,
+  "selection": "dataset quotas plus forced task-family and image-resolution coverage; SHA-256 seeded ordering",
+  "dataset_counts": {
+    "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds": 10,
+    "15_dlr_sara_grid_clamp_converted_externally_to_rlds": 9,
+    "17_dlr_sara_pour_converted_externally_to_rlds": 9,
+    "18_dlr_edan_shared_control_converted_externally_to_rlds": 9,
+    "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds": 9,
+    "28_viola": 9,
+    "49_bridge": 9,
+    "57_fmb": 9,
+    "60_plex_robosuite": 9,
+    "62_robo_set": 9,
+    "9_asu_table_top_converted_externally_to_rlds": 9
+  },
+  "task_family_counts": {
+    "deformable": 4,
+    "insert": 16,
+    "open_close": 2,
+    "pick_place": 63,
+    "pour": 9,
+    "push": 2,
+    "stack": 4
+  },
+  "resolution_counts": {
+    "128x128": 9,
+    "224x224": 37,
+    "256x256": 9,
+    "424x240": 9,
+    "640x360": 9,
+    "640x480": 27
+  },
+  "episodes": [
+    {
+      "episode_id": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_72",
+      "dataset_name": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds",
+      "scene_id": "episode_72",
+      "planning_goal": "stack a white plate onto a red plate",
+      "normalized_goal": "stack a white plate onto a red plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_72",
+      "frame_count": 30,
+      "text_cluster": 70,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 60,
+      "relative_path": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds/episode_72",
+      "task_family": "stack",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_60",
+      "dataset_name": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds",
+      "scene_id": "episode_60",
+      "planning_goal": "place a white plate onto a red plate",
+      "normalized_goal": "place a white plate onto a red plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_60",
+      "frame_count": 30,
+      "text_cluster": 57,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 52,
+      "relative_path": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds/episode_60",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_48",
+      "dataset_name": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds",
+      "scene_id": "episode_48",
+      "planning_goal": "stacking a white plate onto a red plate",
+      "normalized_goal": "stacking a white plate onto a red plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_48",
+      "frame_count": 30,
+      "text_cluster": 43,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 14,
+      "relative_path": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds/episode_48",
+      "task_family": "stack",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_16",
+      "dataset_name": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds",
+      "scene_id": "episode_16",
+      "planning_goal": "placing a white plate onto a red plate",
+      "normalized_goal": "placing a white plate onto a red plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_16",
+      "frame_count": 30,
+      "text_cluster": 8,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 31,
+      "relative_path": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds/episode_16",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_59",
+      "dataset_name": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds",
+      "scene_id": "episode_59",
+      "planning_goal": "placing a white plate onto a red plate",
+      "normalized_goal": "placing a white plate onto a red plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_59",
+      "frame_count": 30,
+      "text_cluster": 55,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 22,
+      "relative_path": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds/episode_59",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_20",
+      "dataset_name": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds",
+      "scene_id": "episode_20",
+      "planning_goal": "place a white plate onto a red plate",
+      "normalized_goal": "place a white plate onto a red plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_20",
+      "frame_count": 30,
+      "text_cluster": 13,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 51,
+      "relative_path": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds/episode_20",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_13",
+      "dataset_name": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds",
+      "scene_id": "episode_13",
+      "planning_goal": "placing a white plate onto a red plate",
+      "normalized_goal": "placing a white plate onto a red plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_13",
+      "frame_count": 30,
+      "text_cluster": 5,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 4,
+      "relative_path": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds/episode_13",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_38",
+      "dataset_name": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds",
+      "scene_id": "episode_38",
+      "planning_goal": "placing a white plate onto a red plate",
+      "normalized_goal": "placing a white plate onto a red plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_38",
+      "frame_count": 30,
+      "text_cluster": 32,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 48,
+      "relative_path": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds/episode_38",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_81",
+      "dataset_name": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds",
+      "scene_id": "episode_81",
+      "planning_goal": "stack a white plate onto a red plate",
+      "normalized_goal": "stack a white plate onto a red plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_81",
+      "frame_count": 30,
+      "text_cluster": 80,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 42,
+      "relative_path": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds/episode_81",
+      "task_family": "stack",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_68",
+      "dataset_name": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds",
+      "scene_id": "episode_68",
+      "planning_goal": "placing a white plate onto a red plate",
+      "normalized_goal": "placing a white plate onto a red plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/11_utokyo_xarm_pick_and_place_converted_externally_to_rlds#episode_68",
+      "frame_count": 30,
+      "text_cluster": 65,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": -1,
+      "relative_path": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds/episode_68",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "15_dlr_sara_grid_clamp_converted_externally_to_rlds#episode_17",
+      "dataset_name": "15_dlr_sara_grid_clamp_converted_externally_to_rlds",
+      "scene_id": "episode_17",
+      "planning_goal": "placing a grid clamp",
+      "normalized_goal": "placing a grid clamp",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/15_dlr_sara_grid_clamp_converted_externally_to_rlds#episode_17",
+      "frame_count": 30,
+      "text_cluster": 6,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 6,
+      "relative_path": "15_dlr_sara_grid_clamp_converted_externally_to_rlds/episode_17",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "15_dlr_sara_grid_clamp_converted_externally_to_rlds#episode_24",
+      "dataset_name": "15_dlr_sara_grid_clamp_converted_externally_to_rlds",
+      "scene_id": "episode_24",
+      "planning_goal": "placing a grid clamp onto a designated location",
+      "normalized_goal": "placing a grid clamp onto a designated location",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/15_dlr_sara_grid_clamp_converted_externally_to_rlds#episode_24",
+      "frame_count": 30,
+      "text_cluster": 11,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 11,
+      "relative_path": "15_dlr_sara_grid_clamp_converted_externally_to_rlds/episode_24",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "15_dlr_sara_grid_clamp_converted_externally_to_rlds#episode_6",
+      "dataset_name": "15_dlr_sara_grid_clamp_converted_externally_to_rlds",
+      "scene_id": "episode_6",
+      "planning_goal": "placing a grid clamp",
+      "normalized_goal": "placing a grid clamp",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/15_dlr_sara_grid_clamp_converted_externally_to_rlds#episode_6",
+      "frame_count": 30,
+      "text_cluster": 26,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 26,
+      "relative_path": "15_dlr_sara_grid_clamp_converted_externally_to_rlds/episode_6",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "15_dlr_sara_grid_clamp_converted_externally_to_rlds#episode_26",
+      "dataset_name": "15_dlr_sara_grid_clamp_converted_externally_to_rlds",
+      "scene_id": "episode_26",
+      "planning_goal": "placing a grid clamp onto a designated location",
+      "normalized_goal": "placing a grid clamp onto a designated location",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/15_dlr_sara_grid_clamp_converted_externally_to_rlds#episode_26",
+      "frame_count": 30,
+      "text_cluster": 12,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 12,
+      "relative_path": "15_dlr_sara_grid_clamp_converted_externally_to_rlds/episode_26",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "15_dlr_sara_grid_clamp_converted_externally_to_rlds#episode_2",
+      "dataset_name": "15_dlr_sara_grid_clamp_converted_externally_to_rlds",
+      "scene_id": "episode_2",
+      "planning_goal": "placing a grid clamp onto a designated location",
+      "normalized_goal": "placing a grid clamp onto a designated location",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/15_dlr_sara_grid_clamp_converted_externally_to_rlds#episode_2",
+      "frame_count": 30,
+      "text_cluster": 8,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 8,
+      "relative_path": "15_dlr_sara_grid_clamp_converted_externally_to_rlds/episode_2",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "15_dlr_sara_grid_clamp_converted_externally_to_rlds#episode_85",
+      "dataset_name": "15_dlr_sara_grid_clamp_converted_externally_to_rlds",
+      "scene_id": "episode_85",
+      "planning_goal": "pick and place a grid clamp",
+      "normalized_goal": "pick and place a grid clamp",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/15_dlr_sara_grid_clamp_converted_externally_to_rlds#episode_85",
+      "frame_count": 30,
+      "text_cluster": 35,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 35,
+      "relative_path": "15_dlr_sara_grid_clamp_converted_externally_to_rlds/episode_85",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "15_dlr_sara_grid_clamp_converted_externally_to_rlds#episode_14",
+      "dataset_name": "15_dlr_sara_grid_clamp_converted_externally_to_rlds",
+      "scene_id": "episode_14",
+      "planning_goal": "picking up a clamp and placing it on a grid",
+      "normalized_goal": "picking up a clamp and placing it on a grid",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/15_dlr_sara_grid_clamp_converted_externally_to_rlds#episode_14",
+      "frame_count": 30,
+      "text_cluster": 4,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 4,
+      "relative_path": "15_dlr_sara_grid_clamp_converted_externally_to_rlds/episode_14",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "15_dlr_sara_grid_clamp_converted_externally_to_rlds#episode_62",
+      "dataset_name": "15_dlr_sara_grid_clamp_converted_externally_to_rlds",
+      "scene_id": "episode_62",
+      "planning_goal": "placing a grid clamp on a designated spot",
+      "normalized_goal": "placing a grid clamp on a designated spot",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/15_dlr_sara_grid_clamp_converted_externally_to_rlds#episode_62",
+      "frame_count": 30,
+      "text_cluster": 27,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 27,
+      "relative_path": "15_dlr_sara_grid_clamp_converted_externally_to_rlds/episode_62",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "15_dlr_sara_grid_clamp_converted_externally_to_rlds#episode_101",
+      "dataset_name": "15_dlr_sara_grid_clamp_converted_externally_to_rlds",
+      "scene_id": "episode_101",
+      "planning_goal": "placing a grid clamp onto a designated area",
+      "normalized_goal": "placing a grid clamp onto a designated area",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/15_dlr_sara_grid_clamp_converted_externally_to_rlds#episode_101",
+      "frame_count": 30,
+      "text_cluster": 1,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 1,
+      "relative_path": "15_dlr_sara_grid_clamp_converted_externally_to_rlds/episode_101",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "17_dlr_sara_pour_converted_externally_to_rlds#episode_0",
+      "dataset_name": "17_dlr_sara_pour_converted_externally_to_rlds",
+      "scene_id": "episode_0",
+      "planning_goal": "pouring liquid from a small container into a mug",
+      "normalized_goal": "pouring liquid from a small container into a mug",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_54/17_dlr_sara_pour_converted_externally_to_rlds#episode_0",
+      "frame_count": 30,
+      "text_cluster": 0,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 19,
+      "relative_path": "17_dlr_sara_pour_converted_externally_to_rlds/episode_0",
+      "task_family": "pour",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "17_dlr_sara_pour_converted_externally_to_rlds#episode_2",
+      "dataset_name": "17_dlr_sara_pour_converted_externally_to_rlds",
+      "scene_id": "episode_2",
+      "planning_goal": "pouring creamer into a mug",
+      "normalized_goal": "pouring creamer into a mug",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_54/17_dlr_sara_pour_converted_externally_to_rlds#episode_2",
+      "frame_count": 30,
+      "text_cluster": 4,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 18,
+      "relative_path": "17_dlr_sara_pour_converted_externally_to_rlds/episode_2",
+      "task_family": "pour",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "17_dlr_sara_pour_converted_externally_to_rlds#episode_28",
+      "dataset_name": "17_dlr_sara_pour_converted_externally_to_rlds",
+      "scene_id": "episode_28",
+      "planning_goal": "pouring liquid from a disposable cup into a mug",
+      "normalized_goal": "pouring liquid from a disposable cup into a mug",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_54/17_dlr_sara_pour_converted_externally_to_rlds#episode_28",
+      "frame_count": 30,
+      "text_cluster": 9,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 17,
+      "relative_path": "17_dlr_sara_pour_converted_externally_to_rlds/episode_28",
+      "task_family": "pour",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "17_dlr_sara_pour_converted_externally_to_rlds#episode_58",
+      "dataset_name": "17_dlr_sara_pour_converted_externally_to_rlds",
+      "scene_id": "episode_58",
+      "planning_goal": "pouring liquid into a mug",
+      "normalized_goal": "pouring liquid into a mug",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_54/17_dlr_sara_pour_converted_externally_to_rlds#episode_58",
+      "frame_count": 30,
+      "text_cluster": 24,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 40,
+      "relative_path": "17_dlr_sara_pour_converted_externally_to_rlds/episode_58",
+      "task_family": "pour",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "17_dlr_sara_pour_converted_externally_to_rlds#episode_49",
+      "dataset_name": "17_dlr_sara_pour_converted_externally_to_rlds",
+      "scene_id": "episode_49",
+      "planning_goal": "pouring contents from a small cup into a mug",
+      "normalized_goal": "pouring contents from a small cup into a mug",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_54/17_dlr_sara_pour_converted_externally_to_rlds#episode_49",
+      "frame_count": 30,
+      "text_cluster": 19,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 15,
+      "relative_path": "17_dlr_sara_pour_converted_externally_to_rlds/episode_49",
+      "task_family": "pour",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "17_dlr_sara_pour_converted_externally_to_rlds#episode_65",
+      "dataset_name": "17_dlr_sara_pour_converted_externally_to_rlds",
+      "scene_id": "episode_65",
+      "planning_goal": "pouring an egg into a mug",
+      "normalized_goal": "pouring an egg into a mug",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_54/17_dlr_sara_pour_converted_externally_to_rlds#episode_65",
+      "frame_count": 30,
+      "text_cluster": 27,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 16,
+      "relative_path": "17_dlr_sara_pour_converted_externally_to_rlds/episode_65",
+      "task_family": "pour",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "17_dlr_sara_pour_converted_externally_to_rlds#episode_88",
+      "dataset_name": "17_dlr_sara_pour_converted_externally_to_rlds",
+      "scene_id": "episode_88",
+      "planning_goal": "pouring contents from a small container into a mug",
+      "normalized_goal": "pouring contents from a small container into a mug",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_54/17_dlr_sara_pour_converted_externally_to_rlds#episode_88",
+      "frame_count": 30,
+      "text_cluster": 43,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 30,
+      "relative_path": "17_dlr_sara_pour_converted_externally_to_rlds/episode_88",
+      "task_family": "pour",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "17_dlr_sara_pour_converted_externally_to_rlds#episode_23",
+      "dataset_name": "17_dlr_sara_pour_converted_externally_to_rlds",
+      "scene_id": "episode_23",
+      "planning_goal": "pouring contents from a small container into a mug",
+      "normalized_goal": "pouring contents from a small container into a mug",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_54/17_dlr_sara_pour_converted_externally_to_rlds#episode_23",
+      "frame_count": 30,
+      "text_cluster": 6,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 45,
+      "relative_path": "17_dlr_sara_pour_converted_externally_to_rlds/episode_23",
+      "task_family": "pour",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "17_dlr_sara_pour_converted_externally_to_rlds#episode_78",
+      "dataset_name": "17_dlr_sara_pour_converted_externally_to_rlds",
+      "scene_id": "episode_78",
+      "planning_goal": "pouring contents from a small container into a mug",
+      "normalized_goal": "pouring contents from a small container into a mug",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_54/17_dlr_sara_pour_converted_externally_to_rlds#episode_78",
+      "frame_count": 30,
+      "text_cluster": 37,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 9,
+      "relative_path": "17_dlr_sara_pour_converted_externally_to_rlds/episode_78",
+      "task_family": "pour",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "18_dlr_edan_shared_control_converted_externally_to_rlds#episode_34",
+      "dataset_name": "18_dlr_edan_shared_control_converted_externally_to_rlds",
+      "scene_id": "episode_34",
+      "planning_goal": "picking an orange from a plate",
+      "normalized_goal": "picking an orange from a plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_54/18_dlr_edan_shared_control_converted_externally_to_rlds#episode_34",
+      "frame_count": 30,
+      "text_cluster": 22,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 52,
+      "relative_path": "18_dlr_edan_shared_control_converted_externally_to_rlds/episode_34",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        360
+      ]
+    },
+    {
+      "episode_id": "18_dlr_edan_shared_control_converted_externally_to_rlds#episode_11",
+      "dataset_name": "18_dlr_edan_shared_control_converted_externally_to_rlds",
+      "scene_id": "episode_11",
+      "planning_goal": "picking a cube from a shelf",
+      "normalized_goal": "picking a cube from a shelf",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_54/18_dlr_edan_shared_control_converted_externally_to_rlds#episode_11",
+      "frame_count": 30,
+      "text_cluster": 4,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 50,
+      "relative_path": "18_dlr_edan_shared_control_converted_externally_to_rlds/episode_11",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        360
+      ]
+    },
+    {
+      "episode_id": "18_dlr_edan_shared_control_converted_externally_to_rlds#episode_5",
+      "dataset_name": "18_dlr_edan_shared_control_converted_externally_to_rlds",
+      "scene_id": "episode_5",
+      "planning_goal": "picking a tube from a shelf",
+      "normalized_goal": "picking a tube from a shelf",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_54/18_dlr_edan_shared_control_converted_externally_to_rlds#episode_5",
+      "frame_count": 30,
+      "text_cluster": 35,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 33,
+      "relative_path": "18_dlr_edan_shared_control_converted_externally_to_rlds/episode_5",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        360
+      ]
+    },
+    {
+      "episode_id": "18_dlr_edan_shared_control_converted_externally_to_rlds#episode_72",
+      "dataset_name": "18_dlr_edan_shared_control_converted_externally_to_rlds",
+      "scene_id": "episode_72",
+      "planning_goal": "picking a yellow apple and placing it in a red bowl",
+      "normalized_goal": "picking a yellow apple and placing it in a red bowl",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_54/18_dlr_edan_shared_control_converted_externally_to_rlds#episode_72",
+      "frame_count": 30,
+      "text_cluster": 49,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 42,
+      "relative_path": "18_dlr_edan_shared_control_converted_externally_to_rlds/episode_72",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        360
+      ]
+    },
+    {
+      "episode_id": "18_dlr_edan_shared_control_converted_externally_to_rlds#episode_71",
+      "dataset_name": "18_dlr_edan_shared_control_converted_externally_to_rlds",
+      "scene_id": "episode_71",
+      "planning_goal": "picking a tube from a shelf",
+      "normalized_goal": "picking a tube from a shelf",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_54/18_dlr_edan_shared_control_converted_externally_to_rlds#episode_71",
+      "frame_count": 30,
+      "text_cluster": 48,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 24,
+      "relative_path": "18_dlr_edan_shared_control_converted_externally_to_rlds/episode_71",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        360
+      ]
+    },
+    {
+      "episode_id": "18_dlr_edan_shared_control_converted_externally_to_rlds#episode_101",
+      "dataset_name": "18_dlr_edan_shared_control_converted_externally_to_rlds",
+      "scene_id": "episode_101",
+      "planning_goal": "picking a green apple from a table",
+      "normalized_goal": "picking a green apple from a table",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_54/18_dlr_edan_shared_control_converted_externally_to_rlds#episode_101",
+      "frame_count": 30,
+      "text_cluster": 2,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 20,
+      "relative_path": "18_dlr_edan_shared_control_converted_externally_to_rlds/episode_101",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        360
+      ]
+    },
+    {
+      "episode_id": "18_dlr_edan_shared_control_converted_externally_to_rlds#episode_86",
+      "dataset_name": "18_dlr_edan_shared_control_converted_externally_to_rlds",
+      "scene_id": "episode_86",
+      "planning_goal": "picking up a mug from a table",
+      "normalized_goal": "picking up a mug from a table",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_54/18_dlr_edan_shared_control_converted_externally_to_rlds#episode_86",
+      "frame_count": 30,
+      "text_cluster": 56,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 18,
+      "relative_path": "18_dlr_edan_shared_control_converted_externally_to_rlds/episode_86",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        360
+      ]
+    },
+    {
+      "episode_id": "18_dlr_edan_shared_control_converted_externally_to_rlds#episode_39",
+      "dataset_name": "18_dlr_edan_shared_control_converted_externally_to_rlds",
+      "scene_id": "episode_39",
+      "planning_goal": "picking a green apple from a plate",
+      "normalized_goal": "picking a green apple from a plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_54/18_dlr_edan_shared_control_converted_externally_to_rlds#episode_39",
+      "frame_count": 30,
+      "text_cluster": 25,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": -1,
+      "relative_path": "18_dlr_edan_shared_control_converted_externally_to_rlds/episode_39",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        360
+      ]
+    },
+    {
+      "episode_id": "18_dlr_edan_shared_control_converted_externally_to_rlds#episode_93",
+      "dataset_name": "18_dlr_edan_shared_control_converted_externally_to_rlds",
+      "scene_id": "episode_93",
+      "planning_goal": "pick up a yellow ball",
+      "normalized_goal": "pick up a yellow ball",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_54/18_dlr_edan_shared_control_converted_externally_to_rlds#episode_93",
+      "frame_count": 30,
+      "text_cluster": 59,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 5,
+      "relative_path": "18_dlr_edan_shared_control_converted_externally_to_rlds/episode_93",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        360
+      ]
+    },
+    {
+      "episode_id": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds#episode_4",
+      "dataset_name": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds",
+      "scene_id": "episode_4",
+      "planning_goal": "picking up a red object",
+      "normalized_goal": "picking up a red object",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/19_ucsd_pick_and_place_dataset_converted_externally_to_rlds#episode_4",
+      "frame_count": 30,
+      "text_cluster": 196,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 125,
+      "relative_path": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds/episode_4",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds#episode_822",
+      "dataset_name": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds",
+      "scene_id": "episode_822",
+      "planning_goal": "picking up a red hexagonal prism from a table",
+      "normalized_goal": "picking up a red hexagonal prism from a table",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/19_ucsd_pick_and_place_dataset_converted_externally_to_rlds#episode_822",
+      "frame_count": 30,
+      "text_cluster": 11,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 107,
+      "relative_path": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds/episode_822",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds#episode_30",
+      "dataset_name": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds",
+      "scene_id": "episode_30",
+      "planning_goal": "picking up a red object",
+      "normalized_goal": "picking up a red object",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/19_ucsd_pick_and_place_dataset_converted_externally_to_rlds#episode_30",
+      "frame_count": 30,
+      "text_cluster": 125,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 68,
+      "relative_path": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds/episode_30",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds#episode_122",
+      "dataset_name": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds",
+      "scene_id": "episode_122",
+      "planning_goal": "picking up a red object from a table",
+      "normalized_goal": "picking up a red object from a table",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/19_ucsd_pick_and_place_dataset_converted_externally_to_rlds#episode_122",
+      "frame_count": 30,
+      "text_cluster": 327,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 15,
+      "relative_path": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds/episode_122",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds#episode_595",
+      "dataset_name": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds",
+      "scene_id": "episode_595",
+      "planning_goal": "picking up a red object from a table",
+      "normalized_goal": "picking up a red object from a table",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/19_ucsd_pick_and_place_dataset_converted_externally_to_rlds#episode_595",
+      "frame_count": 30,
+      "text_cluster": 283,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 13,
+      "relative_path": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds/episode_595",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds#episode_195",
+      "dataset_name": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds",
+      "scene_id": "episode_195",
+      "planning_goal": "picking up a red object",
+      "normalized_goal": "picking up a red object",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/19_ucsd_pick_and_place_dataset_converted_externally_to_rlds#episode_195",
+      "frame_count": 30,
+      "text_cluster": 26,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 72,
+      "relative_path": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds/episode_195",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds#episode_1069",
+      "dataset_name": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds",
+      "scene_id": "episode_1069",
+      "planning_goal": "placing a pot into a sink",
+      "normalized_goal": "placing a pot into a sink",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/19_ucsd_pick_and_place_dataset_converted_externally_to_rlds#episode_1069",
+      "frame_count": 30,
+      "text_cluster": 211,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 22,
+      "relative_path": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds/episode_1069",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds#episode_964",
+      "dataset_name": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds",
+      "scene_id": "episode_964",
+      "planning_goal": "picking up a red block",
+      "normalized_goal": "picking up a red block",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/19_ucsd_pick_and_place_dataset_converted_externally_to_rlds#episode_964",
+      "frame_count": 30,
+      "text_cluster": 28,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 81,
+      "relative_path": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds/episode_964",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds#episode_151",
+      "dataset_name": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds",
+      "scene_id": "episode_151",
+      "planning_goal": "picking up a red object from a table",
+      "normalized_goal": "picking up a red object from a table",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_0/19_ucsd_pick_and_place_dataset_converted_externally_to_rlds#episode_151",
+      "frame_count": 30,
+      "text_cluster": 310,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 88,
+      "relative_path": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds/episode_151",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "28_viola#episode_35",
+      "dataset_name": "28_viola",
+      "scene_id": "episode_35",
+      "planning_goal": "moving a bowl from a lazy susan to a plate",
+      "normalized_goal": "moving a bowl from a lazy susan to a plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_19/28_viola#episode_35",
+      "frame_count": 30,
+      "text_cluster": 21,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 21,
+      "relative_path": "28_viola/episode_35",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "28_viola#episode_32",
+      "dataset_name": "28_viola",
+      "scene_id": "episode_32",
+      "planning_goal": "moving a bowl from a lazy susan to a plate",
+      "normalized_goal": "moving a bowl from a lazy susan to a plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_19/28_viola#episode_32",
+      "frame_count": 30,
+      "text_cluster": 20,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 20,
+      "relative_path": "28_viola/episode_32",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "28_viola#episode_94",
+      "dataset_name": "28_viola",
+      "scene_id": "episode_94",
+      "planning_goal": "moving a bowl from a lazy susan to a plate",
+      "normalized_goal": "moving a bowl from a lazy susan to a plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_19/28_viola#episode_94",
+      "frame_count": 30,
+      "text_cluster": 43,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 43,
+      "relative_path": "28_viola/episode_94",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "28_viola#episode_133",
+      "dataset_name": "28_viola",
+      "scene_id": "episode_133",
+      "planning_goal": "moving a bowl from a lazy susan to a plate",
+      "normalized_goal": "moving a bowl from a lazy susan to a plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_19/28_viola#episode_133",
+      "frame_count": 30,
+      "text_cluster": 12,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 12,
+      "relative_path": "28_viola/episode_133",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "28_viola#episode_92",
+      "dataset_name": "28_viola",
+      "scene_id": "episode_92",
+      "planning_goal": "moving a bowl from a lazy susan to a plate",
+      "normalized_goal": "moving a bowl from a lazy susan to a plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_19/28_viola#episode_92",
+      "frame_count": 30,
+      "text_cluster": 42,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 42,
+      "relative_path": "28_viola/episode_92",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "28_viola#episode_58",
+      "dataset_name": "28_viola",
+      "scene_id": "episode_58",
+      "planning_goal": "moving a bowl from a lazy susan to a plate",
+      "normalized_goal": "moving a bowl from a lazy susan to a plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_19/28_viola#episode_58",
+      "frame_count": 30,
+      "text_cluster": 25,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 25,
+      "relative_path": "28_viola/episode_58",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "28_viola#episode_128",
+      "dataset_name": "28_viola",
+      "scene_id": "episode_128",
+      "planning_goal": "moving a bowl from a lazy susan to a plate",
+      "normalized_goal": "moving a bowl from a lazy susan to a plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_19/28_viola#episode_128",
+      "frame_count": 30,
+      "text_cluster": 10,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 10,
+      "relative_path": "28_viola/episode_128",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "28_viola#episode_90",
+      "dataset_name": "28_viola",
+      "scene_id": "episode_90",
+      "planning_goal": "moving a bowl from a lazy susan to a plate",
+      "normalized_goal": "moving a bowl from a lazy susan to a plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_19/28_viola#episode_90",
+      "frame_count": 30,
+      "text_cluster": 41,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 41,
+      "relative_path": "28_viola/episode_90",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "28_viola#episode_15",
+      "dataset_name": "28_viola",
+      "scene_id": "episode_15",
+      "planning_goal": "moving a bowl from a lazy susan to a plate",
+      "normalized_goal": "moving a bowl from a lazy susan to a plate",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_19/28_viola#episode_15",
+      "frame_count": 30,
+      "text_cluster": 14,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 14,
+      "relative_path": "28_viola/episode_15",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "49_bridge#episode_16117",
+      "dataset_name": "49_bridge",
+      "scene_id": "episode_16117",
+      "planning_goal": "placing an object into a pot",
+      "normalized_goal": "placing an object into a pot",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_6/49_bridge#episode_16117",
+      "frame_count": 30,
+      "text_cluster": 93,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 28,
+      "relative_path": "49_bridge/episode_16117",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "49_bridge#episode_6245",
+      "dataset_name": "49_bridge",
+      "scene_id": "episode_6245",
+      "planning_goal": "knock over a spice container within a cardboard box",
+      "normalized_goal": "knock over a spice container within a cardboard box",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_15/49_bridge#episode_6245",
+      "frame_count": 30,
+      "text_cluster": 183,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 76,
+      "relative_path": "49_bridge/episode_6245",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "49_bridge#episode_23649",
+      "dataset_name": "49_bridge",
+      "scene_id": "episode_23649",
+      "planning_goal": "moving a towel to the top left corner of a table",
+      "normalized_goal": "moving a towel to the top left corner of a table",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_11/49_bridge#episode_23649",
+      "frame_count": 30,
+      "text_cluster": 29,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 5,
+      "relative_path": "49_bridge/episode_23649",
+      "task_family": "deformable",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "49_bridge#episode_8020",
+      "dataset_name": "49_bridge",
+      "scene_id": "episode_8020",
+      "planning_goal": "moving a bowl onto a napkin",
+      "normalized_goal": "moving a bowl onto a napkin",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_17/49_bridge#episode_8020",
+      "frame_count": 30,
+      "text_cluster": 437,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 26,
+      "relative_path": "49_bridge/episode_8020",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "49_bridge#episode_22511",
+      "dataset_name": "49_bridge",
+      "scene_id": "episode_22511",
+      "planning_goal": "move a pot next to a cloth and near the front edge of the table",
+      "normalized_goal": "move a pot next to a cloth and near the front edge of the table",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_11/49_bridge#episode_22511",
+      "frame_count": 30,
+      "text_cluster": 419,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 3,
+      "relative_path": "49_bridge/episode_22511",
+      "task_family": "deformable",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "49_bridge#episode_1156",
+      "dataset_name": "49_bridge",
+      "scene_id": "episode_1156",
+      "planning_goal": "move a brush next to a pot",
+      "normalized_goal": "move a brush next to a pot",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_3/49_bridge#episode_1156",
+      "frame_count": 30,
+      "text_cluster": 128,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 55,
+      "relative_path": "49_bridge/episode_1156",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "49_bridge#episode_16481",
+      "dataset_name": "49_bridge",
+      "scene_id": "episode_16481",
+      "planning_goal": "moving an ear of corn from a bowl to a location on a table",
+      "normalized_goal": "moving an ear of corn from a bowl to a location on a table",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_6/49_bridge#episode_16481",
+      "frame_count": 30,
+      "text_cluster": 219,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 43,
+      "relative_path": "49_bridge/episode_16481",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "49_bridge#episode_24339",
+      "dataset_name": "49_bridge",
+      "scene_id": "episode_24339",
+      "planning_goal": "moving a bowl onto a yellow cloth",
+      "normalized_goal": "moving a bowl onto a yellow cloth",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_12/49_bridge#episode_24339",
+      "frame_count": 30,
+      "text_cluster": 255,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 83,
+      "relative_path": "49_bridge/episode_24339",
+      "task_family": "deformable",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "49_bridge#episode_2224",
+      "dataset_name": "49_bridge",
+      "scene_id": "episode_2224",
+      "planning_goal": "moving a pot closer to an avocado",
+      "normalized_goal": "moving a pot closer to an avocado",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_10/49_bridge#episode_2224",
+      "frame_count": 30,
+      "text_cluster": 295,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 85,
+      "relative_path": "49_bridge/episode_2224",
+      "task_family": "pick_place",
+      "resolution": [
+        640,
+        480
+      ]
+    },
+    {
+      "episode_id": "57_fmb#episode_1549",
+      "dataset_name": "57_fmb",
+      "scene_id": "episode_1549",
+      "planning_goal": "inserting a brown cylindrical object into a designated slot on a pink platform",
+      "normalized_goal": "inserting a brown cylindrical object into a designated slot on a pink platform",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_27/57_fmb#episode_1549",
+      "frame_count": 30,
+      "text_cluster": 331,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 132,
+      "relative_path": "57_fmb/episode_1549",
+      "task_family": "insert",
+      "resolution": [
+        256,
+        256
+      ]
+    },
+    {
+      "episode_id": "57_fmb#episode_3673",
+      "dataset_name": "57_fmb",
+      "scene_id": "episode_3673",
+      "planning_goal": "inserting a three-pronged object into its matching slot",
+      "normalized_goal": "inserting a three pronged object into its matching slot",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_29/57_fmb#episode_3673",
+      "frame_count": 30,
+      "text_cluster": 31,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 17,
+      "relative_path": "57_fmb/episode_3673",
+      "task_family": "insert",
+      "resolution": [
+        256,
+        256
+      ]
+    },
+    {
+      "episode_id": "57_fmb#episode_5713",
+      "dataset_name": "57_fmb",
+      "scene_id": "episode_5713",
+      "planning_goal": "inserting a double-square object into a designated slot",
+      "normalized_goal": "inserting a double square object into a designated slot",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_31/57_fmb#episode_5713",
+      "frame_count": 30,
+      "text_cluster": 3,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 104,
+      "relative_path": "57_fmb/episode_5713",
+      "task_family": "insert",
+      "resolution": [
+        256,
+        256
+      ]
+    },
+    {
+      "episode_id": "57_fmb#episode_2676",
+      "dataset_name": "57_fmb",
+      "scene_id": "episode_2676",
+      "planning_goal": "inserting a rectangular prism into its corresponding slot",
+      "normalized_goal": "inserting a rectangular prism into its corresponding slot",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_28/57_fmb#episode_2676",
+      "frame_count": 30,
+      "text_cluster": 50,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 123,
+      "relative_path": "57_fmb/episode_2676",
+      "task_family": "insert",
+      "resolution": [
+        256,
+        256
+      ]
+    },
+    {
+      "episode_id": "57_fmb#episode_4108",
+      "dataset_name": "57_fmb",
+      "scene_id": "episode_4108",
+      "planning_goal": "inserting a square prism into a matching cutout on a shape sorter",
+      "normalized_goal": "inserting a square prism into a matching cutout on a shape sorter",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_30/57_fmb#episode_4108",
+      "frame_count": 30,
+      "text_cluster": 175,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 115,
+      "relative_path": "57_fmb/episode_4108",
+      "task_family": "insert",
+      "resolution": [
+        256,
+        256
+      ]
+    },
+    {
+      "episode_id": "57_fmb#episode_7189",
+      "dataset_name": "57_fmb",
+      "scene_id": "episode_7189",
+      "planning_goal": "inserting a brown dowel into a green u-shaped block on a pink platform",
+      "normalized_goal": "inserting a brown dowel into a green u shaped block on a pink platform",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_33/57_fmb#episode_7189",
+      "frame_count": 30,
+      "text_cluster": 133,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 126,
+      "relative_path": "57_fmb/episode_7189",
+      "task_family": "insert",
+      "resolution": [
+        256,
+        256
+      ]
+    },
+    {
+      "episode_id": "57_fmb#episode_2478",
+      "dataset_name": "57_fmb",
+      "scene_id": "episode_2478",
+      "planning_goal": "inserting a green object into a designated slot within a blue grid",
+      "normalized_goal": "inserting a green object into a designated slot within a blue grid",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_28/57_fmb#episode_2478",
+      "frame_count": 30,
+      "text_cluster": 49,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 66,
+      "relative_path": "57_fmb/episode_2478",
+      "task_family": "insert",
+      "resolution": [
+        256,
+        256
+      ]
+    },
+    {
+      "episode_id": "57_fmb#episode_6621",
+      "dataset_name": "57_fmb",
+      "scene_id": "episode_6621",
+      "planning_goal": "inserting an h-shaped object into its matching slot",
+      "normalized_goal": "inserting an h shaped object into its matching slot",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_32/57_fmb#episode_6621",
+      "frame_count": 30,
+      "text_cluster": 204,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 54,
+      "relative_path": "57_fmb/episode_6621",
+      "task_family": "insert",
+      "resolution": [
+        256,
+        256
+      ]
+    },
+    {
+      "episode_id": "57_fmb#episode_290",
+      "dataset_name": "57_fmb",
+      "scene_id": "episode_290",
+      "planning_goal": "inserting a rectangular prism into its corresponding slot on a green board",
+      "normalized_goal": "inserting a rectangular prism into its corresponding slot on a green board",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_28/57_fmb#episode_290",
+      "frame_count": 30,
+      "text_cluster": 394,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 53,
+      "relative_path": "57_fmb/episode_290",
+      "task_family": "insert",
+      "resolution": [
+        256,
+        256
+      ]
+    },
+    {
+      "episode_id": "60_plex_robosuite#episode_75",
+      "dataset_name": "60_plex_robosuite",
+      "scene_id": "episode_75",
+      "planning_goal": "placing a block into a compartmentalized container",
+      "normalized_goal": "placing a block into a compartmentalized container",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_35/60_plex_robosuite#episode_75",
+      "frame_count": 30,
+      "text_cluster": 5,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 97,
+      "relative_path": "60_plex_robosuite/episode_75",
+      "task_family": "insert",
+      "resolution": [
+        128,
+        128
+      ]
+    },
+    {
+      "episode_id": "60_plex_robosuite#episode_15",
+      "dataset_name": "60_plex_robosuite",
+      "scene_id": "episode_15",
+      "planning_goal": "placing a block into a designated compartment",
+      "normalized_goal": "placing a block into a designated compartment",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_35/60_plex_robosuite#episode_15",
+      "frame_count": 30,
+      "text_cluster": 99,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 72,
+      "relative_path": "60_plex_robosuite/episode_15",
+      "task_family": "insert",
+      "resolution": [
+        128,
+        128
+      ]
+    },
+    {
+      "episode_id": "60_plex_robosuite#episode_228",
+      "dataset_name": "60_plex_robosuite",
+      "scene_id": "episode_228",
+      "planning_goal": "placing a carton into a compartment",
+      "normalized_goal": "placing a carton into a compartment",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_35/60_plex_robosuite#episode_228",
+      "frame_count": 30,
+      "text_cluster": 285,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 11,
+      "relative_path": "60_plex_robosuite/episode_228",
+      "task_family": "insert",
+      "resolution": [
+        128,
+        128
+      ]
+    },
+    {
+      "episode_id": "60_plex_robosuite#episode_41",
+      "dataset_name": "60_plex_robosuite",
+      "scene_id": "episode_41",
+      "planning_goal": "placing a cylinder into a designated compartment",
+      "normalized_goal": "placing a cylinder into a designated compartment",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_35/60_plex_robosuite#episode_41",
+      "frame_count": 30,
+      "text_cluster": 37,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 32,
+      "relative_path": "60_plex_robosuite/episode_41",
+      "task_family": "insert",
+      "resolution": [
+        128,
+        128
+      ]
+    },
+    {
+      "episode_id": "60_plex_robosuite#episode_202",
+      "dataset_name": "60_plex_robosuite",
+      "scene_id": "episode_202",
+      "planning_goal": "placing a box into a compartment",
+      "normalized_goal": "placing a box into a compartment",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_35/60_plex_robosuite#episode_202",
+      "frame_count": 30,
+      "text_cluster": 323,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 46,
+      "relative_path": "60_plex_robosuite/episode_202",
+      "task_family": "insert",
+      "resolution": [
+        128,
+        128
+      ]
+    },
+    {
+      "episode_id": "60_plex_robosuite#episode_31",
+      "dataset_name": "60_plex_robosuite",
+      "scene_id": "episode_31",
+      "planning_goal": "opening a door",
+      "normalized_goal": "opening a door",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_35/60_plex_robosuite#episode_31",
+      "frame_count": 30,
+      "text_cluster": 111,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 24,
+      "relative_path": "60_plex_robosuite/episode_31",
+      "task_family": "open_close",
+      "resolution": [
+        128,
+        128
+      ]
+    },
+    {
+      "episode_id": "60_plex_robosuite#episode_19",
+      "dataset_name": "60_plex_robosuite",
+      "scene_id": "episode_19",
+      "planning_goal": "stacking a red cube on a green cube",
+      "normalized_goal": "stacking a red cube on a green cube",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_35/60_plex_robosuite#episode_19",
+      "frame_count": 30,
+      "text_cluster": 89,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 106,
+      "relative_path": "60_plex_robosuite/episode_19",
+      "task_family": "stack",
+      "resolution": [
+        128,
+        128
+      ]
+    },
+    {
+      "episode_id": "60_plex_robosuite#episode_322",
+      "dataset_name": "60_plex_robosuite",
+      "scene_id": "episode_322",
+      "planning_goal": "placing a red block into a specific compartment",
+      "normalized_goal": "placing a red block into a specific compartment",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_35/60_plex_robosuite#episode_322",
+      "frame_count": 30,
+      "text_cluster": 35,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 65,
+      "relative_path": "60_plex_robosuite/episode_322",
+      "task_family": "insert",
+      "resolution": [
+        128,
+        128
+      ]
+    },
+    {
+      "episode_id": "60_plex_robosuite#episode_332",
+      "dataset_name": "60_plex_robosuite",
+      "scene_id": "episode_332",
+      "planning_goal": "place a box into a compartment",
+      "normalized_goal": "place a box into a compartment",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_35/60_plex_robosuite#episode_332",
+      "frame_count": 30,
+      "text_cluster": 59,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 84,
+      "relative_path": "60_plex_robosuite/episode_332",
+      "task_family": "insert",
+      "resolution": [
+        128,
+        128
+      ]
+    },
+    {
+      "episode_id": "62_robo_set#episode_11106",
+      "dataset_name": "62_robo_set",
+      "scene_id": "episode_11106",
+      "planning_goal": "pulling a strainer away from the camera",
+      "normalized_goal": "pulling a strainer away from the camera",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_36/62_robo_set#episode_11106",
+      "frame_count": 30,
+      "text_cluster": 438,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 126,
+      "relative_path": "62_robo_set/episode_11106",
+      "task_family": "push",
+      "resolution": [
+        424,
+        240
+      ]
+    },
+    {
+      "episode_id": "62_robo_set#episode_17521",
+      "dataset_name": "62_robo_set",
+      "scene_id": "episode_17521",
+      "planning_goal": "retrieving a container of butter from a drawer",
+      "normalized_goal": "retrieving a container of butter from a drawer",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_44/62_robo_set#episode_17521",
+      "frame_count": 30,
+      "text_cluster": 302,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 45,
+      "relative_path": "62_robo_set/episode_17521",
+      "task_family": "open_close",
+      "resolution": [
+        424,
+        240
+      ]
+    },
+    {
+      "episode_id": "62_robo_set#episode_3169",
+      "dataset_name": "62_robo_set",
+      "scene_id": "episode_3169",
+      "planning_goal": "drag a mug forward",
+      "normalized_goal": "drag a mug forward",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_46/62_robo_set#episode_3169",
+      "frame_count": 30,
+      "text_cluster": 32,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 145,
+      "relative_path": "62_robo_set/episode_3169",
+      "task_family": "push",
+      "resolution": [
+        424,
+        240
+      ]
+    },
+    {
+      "episode_id": "62_robo_set#episode_9738",
+      "dataset_name": "62_robo_set",
+      "scene_id": "episode_9738",
+      "planning_goal": "picking a banana and placing it in a strainer",
+      "normalized_goal": "picking a banana and placing it in a strainer",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_53/62_robo_set#episode_9738",
+      "frame_count": 30,
+      "text_cluster": 406,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 38,
+      "relative_path": "62_robo_set/episode_9738",
+      "task_family": "pick_place",
+      "resolution": [
+        424,
+        240
+      ]
+    },
+    {
+      "episode_id": "62_robo_set#episode_18142",
+      "dataset_name": "62_robo_set",
+      "scene_id": "episode_18142",
+      "planning_goal": "pick up a bottle of ketchup and place it in a strainer",
+      "normalized_goal": "pick up a bottle of ketchup and place it in a strainer",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_44/62_robo_set#episode_18142",
+      "frame_count": 30,
+      "text_cluster": 4,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 112,
+      "relative_path": "62_robo_set/episode_18142",
+      "task_family": "pick_place",
+      "resolution": [
+        424,
+        240
+      ]
+    },
+    {
+      "episode_id": "62_robo_set#episode_8575",
+      "dataset_name": "62_robo_set",
+      "scene_id": "episode_8575",
+      "planning_goal": "retrieving a package of butter",
+      "normalized_goal": "retrieving a package of butter",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_52/62_robo_set#episode_8575",
+      "frame_count": 30,
+      "text_cluster": 386,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 70,
+      "relative_path": "62_robo_set/episode_8575",
+      "task_family": "pick_place",
+      "resolution": [
+        424,
+        240
+      ]
+    },
+    {
+      "episode_id": "62_robo_set#episode_582",
+      "dataset_name": "62_robo_set",
+      "scene_id": "episode_582",
+      "planning_goal": "picking up a ketchup bottle and placing it in a strainer",
+      "normalized_goal": "picking up a ketchup bottle and placing it in a strainer",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_49/62_robo_set#episode_582",
+      "frame_count": 30,
+      "text_cluster": 270,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 86,
+      "relative_path": "62_robo_set/episode_582",
+      "task_family": "pick_place",
+      "resolution": [
+        424,
+        240
+      ]
+    },
+    {
+      "episode_id": "62_robo_set#episode_11051",
+      "dataset_name": "62_robo_set",
+      "scene_id": "episode_11051",
+      "planning_goal": "pick up a bottle of ketchup and place it in a small bowl",
+      "normalized_goal": "pick up a bottle of ketchup and place it in a small bowl",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_36/62_robo_set#episode_11051",
+      "frame_count": 30,
+      "text_cluster": 437,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 1,
+      "relative_path": "62_robo_set/episode_11051",
+      "task_family": "pick_place",
+      "resolution": [
+        424,
+        240
+      ]
+    },
+    {
+      "episode_id": "62_robo_set#episode_5990",
+      "dataset_name": "62_robo_set",
+      "scene_id": "episode_5990",
+      "planning_goal": "picking up a blue towel",
+      "normalized_goal": "picking up a blue towel",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_49/62_robo_set#episode_5990",
+      "frame_count": 30,
+      "text_cluster": 320,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 109,
+      "relative_path": "62_robo_set/episode_5990",
+      "task_family": "deformable",
+      "resolution": [
+        424,
+        240
+      ]
+    },
+    {
+      "episode_id": "9_asu_table_top_converted_externally_to_rlds#episode_83",
+      "dataset_name": "9_asu_table_top_converted_externally_to_rlds",
+      "scene_id": "episode_83",
+      "planning_goal": "picking up a red box",
+      "normalized_goal": "picking up a red box",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_18/9_asu_table_top_converted_externally_to_rlds#episode_83",
+      "frame_count": 30,
+      "text_cluster": 91,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 53,
+      "relative_path": "9_asu_table_top_converted_externally_to_rlds/episode_83",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "9_asu_table_top_converted_externally_to_rlds#episode_14",
+      "dataset_name": "9_asu_table_top_converted_externally_to_rlds",
+      "scene_id": "episode_14",
+      "planning_goal": "moving a red square",
+      "normalized_goal": "moving a red square",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_18/9_asu_table_top_converted_externally_to_rlds#episode_14",
+      "frame_count": 30,
+      "text_cluster": 16,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 21,
+      "relative_path": "9_asu_table_top_converted_externally_to_rlds/episode_14",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "9_asu_table_top_converted_externally_to_rlds#episode_54",
+      "dataset_name": "9_asu_table_top_converted_externally_to_rlds",
+      "scene_id": "episode_54",
+      "planning_goal": "placing a coke bottle on a table",
+      "normalized_goal": "placing a coke bottle on a table",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_18/9_asu_table_top_converted_externally_to_rlds#episode_54",
+      "frame_count": 30,
+      "text_cluster": 59,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 30,
+      "relative_path": "9_asu_table_top_converted_externally_to_rlds/episode_54",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "9_asu_table_top_converted_externally_to_rlds#episode_104",
+      "dataset_name": "9_asu_table_top_converted_externally_to_rlds",
+      "scene_id": "episode_104",
+      "planning_goal": "raising a green glass bottle",
+      "normalized_goal": "raising a green glass bottle",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_18/9_asu_table_top_converted_externally_to_rlds#episode_104",
+      "frame_count": 30,
+      "text_cluster": 7,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 8,
+      "relative_path": "9_asu_table_top_converted_externally_to_rlds/episode_104",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "9_asu_table_top_converted_externally_to_rlds#episode_31",
+      "dataset_name": "9_asu_table_top_converted_externally_to_rlds",
+      "scene_id": "episode_31",
+      "planning_goal": "picking up a cocacola can",
+      "normalized_goal": "picking up a cocacola can",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_18/9_asu_table_top_converted_externally_to_rlds#episode_31",
+      "frame_count": 30,
+      "text_cluster": 34,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 18,
+      "relative_path": "9_asu_table_top_converted_externally_to_rlds/episode_31",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "9_asu_table_top_converted_externally_to_rlds#episode_35",
+      "dataset_name": "9_asu_table_top_converted_externally_to_rlds",
+      "scene_id": "episode_35",
+      "planning_goal": "pick up a maroon block",
+      "normalized_goal": "pick up a maroon block",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_18/9_asu_table_top_converted_externally_to_rlds#episode_35",
+      "frame_count": 30,
+      "text_cluster": 38,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 12,
+      "relative_path": "9_asu_table_top_converted_externally_to_rlds/episode_35",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "9_asu_table_top_converted_externally_to_rlds#episode_11",
+      "dataset_name": "9_asu_table_top_converted_externally_to_rlds",
+      "scene_id": "episode_11",
+      "planning_goal": "picking up a blue can",
+      "normalized_goal": "picking up a blue can",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_18/9_asu_table_top_converted_externally_to_rlds#episode_11",
+      "frame_count": 30,
+      "text_cluster": 13,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 13,
+      "relative_path": "9_asu_table_top_converted_externally_to_rlds/episode_11",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "9_asu_table_top_converted_externally_to_rlds#episode_36",
+      "dataset_name": "9_asu_table_top_converted_externally_to_rlds",
+      "scene_id": "episode_36",
+      "planning_goal": "lifting a pepsi can",
+      "normalized_goal": "lifting a pepsi can",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_18/9_asu_table_top_converted_externally_to_rlds#episode_36",
+      "frame_count": 30,
+      "text_cluster": 39,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 0,
+      "relative_path": "9_asu_table_top_converted_externally_to_rlds/episode_36",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    },
+    {
+      "episode_id": "9_asu_table_top_converted_externally_to_rlds#episode_34",
+      "dataset_name": "9_asu_table_top_converted_externally_to_rlds",
+      "scene_id": "episode_34",
+      "planning_goal": "placing a green bottle on the table",
+      "normalized_goal": "placing a green bottle on the table",
+      "source_image_directory": "rt_frames_success/rtx_frames_success_18/9_asu_table_top_converted_externally_to_rlds#episode_34",
+      "frame_count": 30,
+      "text_cluster": 37,
+      "selection_stage": "final_multimodal_diversity",
+      "multimodal_cluster": 62,
+      "relative_path": "9_asu_table_top_converted_externally_to_rlds/episode_34",
+      "task_family": "pick_place",
+      "resolution": [
+        224,
+        224
+      ]
+    }
+  ]
+}

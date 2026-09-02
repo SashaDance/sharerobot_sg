@@ -1,0 +1,94 @@
+name: unified-sgg
+
+services:
+  qwen:
+    image: vllm/vllm-openai:v0.24.0
+    command:
+      - --model
+      - /models/qwen3.8-27b
+      - --served-model-name
+      - Qwen/Qwen3.8-27B
+      - --dtype
+      - bfloat16
+      - --tensor-parallel-size
+      - "1"
+      - --max-model-len
+      - "32768"
+      - --max-num-seqs
+      - "1"
+      - --gpu-memory-utilization
+      - "0.92"
+      - --limit-mm-per-prompt
+      - '{"image":30}'
+      - --trust-remote-code
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - ${MODEL_ROOT:-/datasets/unified_scene_graph_models}:/models:ro
+      - ./manifests:/manifests:ro
+    ipc: host
+    shm_size: 32gb
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["1"]
+              capabilities: [gpu]
+
+  qwen-proxy:
+    image: python:3.12-alpine
+    command: ["python", "/proxy/auth_proxy.py"]
+    environment:
+      INFERENCE_API_KEY: ${INFERENCE_API_KEY:?set INFERENCE_API_KEY in the mode-600 runtime env file}
+      UPSTREAM_HOST: qwen
+      UPSTREAM_PORT: "8000"
+    volumes:
+      - ./auth_proxy.py:/proxy/auth_proxy.py:ro
+    ports:
+      - 127.0.0.1:8008:8080
+    depends_on:
+      - qwen
+    restart: unless-stopped
+
+  core:
+    profiles: [tools]
+    image: unified-sgg-core:1.0.0
+    build:
+      context: .
+      dockerfile: docker/core.Dockerfile
+    environment:
+      INFERENCE_API_KEY: ${INFERENCE_API_KEY:?set INFERENCE_API_KEY in the mode-600 runtime env file}
+    volumes:
+      - ${DATASET_ROOT:-/datasets}:/datasets:ro
+      - ${RUN_ROOT:-/datasets/unified_scene_graph_runs}:/runs
+      - ${MODEL_ROOT:-/datasets/unified_scene_graph_models}:/models:ro
+      - ./manifests:/manifests:ro
+    ipc: host
+    shm_size: 32gb
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["1"]
+              capabilities: [gpu]
+
+  da3:
+    profiles: [tools]
+    image: unified-sgg-da3:1.0.0
+    build:
+      context: .
+      dockerfile: docker/da3.Dockerfile
+    volumes:
+      - ${RUN_ROOT:-/datasets/unified_scene_graph_runs}:/runs
+      - ${MODEL_ROOT:-/datasets/unified_scene_graph_models}:/models:ro
+    ipc: host
+    shm_size: 32gb
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["1"]
+              capabilities: [gpu]
