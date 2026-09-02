@@ -27,3 +27,10 @@ Reviewed 2026-09-02. The purpose of this note is to separate methods that can be
 2. **Compact event graph with verification.** Predict initial state, action intervals, state transitions, and final state once for the full sequence. Run a second visual verifier, reject unsupported entities/edges, then expand the verified event graph deterministically to all 30 frames. This tests temporal persistence and compact serialization while keeping our ontology.
 
 Neither experiment is presented as a reproduction of the authors' reported benchmark numbers. They are controlled adaptations chosen because the released systems otherwise require incompatible vocabularies, benchmark preprocessing, or additional training.
+
+## Pilot results
+
+- `89de902fc6ed1f39022193e9eb364534793a8d46`, Refer-Agent-inspired reflection: **2 fully successful, 7 partially successful, 2 unsuccessful**, versus 2/6/3 for the prior hybrid. It corrected the FMB manipulated object from an orange to a blue cylinder, but did not solve the repeated Clamp instance or the RoboSet goal/video mismatch.
+- `6a92f2661a2123be9ee0d61ff29257801aac002a`, persistent event graph: **7 fully successful, 2 partially successful, 2 unsuccessful** on exactly the same entities and masks. It recovered coherent actions and persistent state changes in ASU, Pour, EDAN, UCSD, Bridge, and PLEX. The second same-model verifier changed none of the 11 drafts, so the gain is attributable to the event representation and deterministic state expansion rather than to verification.
+
+The recommended pipeline is therefore the reflected SAM3-first/SAM2-missing-frame tracker followed by persistent event inference. The verifier call should be disabled or replaced by an independent signal before a larger run. Direct execution of Refer-Agent, SceneGraphVLM, UNO, or WorldSGG remains non-representative because their released checkpoints, vocabularies, training data, or preprocessing do not match this fixed-role robot setting.
