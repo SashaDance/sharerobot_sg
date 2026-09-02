@@ -260,7 +260,11 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
         role: ([] if merged["roles"][role] is not None else None) for role in ROLE_NAMES
     }
     tracking_audit = []
-    for current, _ in contextual_chunks(indices, int(config["qwen"]["frames_per_request"])):
+    tracking_chunk_size = int(config["qwen"]["tracking_frames_per_request"])
+    if not 1 <= tracking_chunk_size <= int(config["qwen"]["frames_per_request"]):
+        raise ValueError("tracking_frames_per_request must be between 1 and frames_per_request")
+    for start in range(0, len(indices), tracking_chunk_size):
+        current = indices[start : start + tracking_chunk_size]
         prompt = tracking_prompt(context["planning_goal"], merged["roles"], current)
         content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
         for index in current:
