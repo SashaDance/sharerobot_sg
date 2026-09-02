@@ -22,7 +22,7 @@
     "prompt_mode": "qwen_track_verified_text",
     "box_coordinate_scale": 1000,
     "candidate_prompts": ["sam_prompt", "canonical_name"],
-    "candidate_selection": "qwen_all_frame_boxes"
+    "candidate_selection": "qwen_overlap_then_center_distance_v2"
   },
   "segmenter": {
     "backend": "sam3"

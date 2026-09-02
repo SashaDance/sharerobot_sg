@@ -74,7 +74,7 @@ def _run_prompt(model: Any, frames: Path, prompt: str, frame_count: int) -> tupl
     }
 
 
-def _box_overlap(mask: np.ndarray, box: list[int], coordinate_scale: int) -> tuple[int, float]:
+def _box_match(mask: np.ndarray, box: list[int], coordinate_scale: int) -> tuple[int, float, float]:
     height, width = mask.shape
     x_min = max(0, min(width, int(np.floor(box[0] * width / coordinate_scale))))
     y_min = max(0, min(height, int(np.floor(box[1] * height / coordinate_scale))))
@@ -83,13 +83,23 @@ def _box_overlap(mask: np.ndarray, box: list[int], coordinate_scale: int) -> tup
     box_area = max(0, x_max - x_min) * max(0, y_max - y_min)
     mask_area = int(mask.sum())
     if box_area == 0 or mask_area == 0:
-        return 0, 0.0
+        return 0, 0.0, float("inf")
     intersection = int(mask[y_min:y_max, x_min:x_max].sum())
-    if intersection == 0:
-        return 0, 0.0
-    dice = 2.0 * intersection / (mask_area + box_area)
-    containment = intersection / mask_area
-    return intersection, dice + containment
+    overlap = 0.0
+    if intersection:
+        dice = 2.0 * intersection / (mask_area + box_area)
+        containment = intersection / mask_area
+        overlap = dice + containment
+    ys, xs = np.nonzero(mask)
+    mask_center_x = (float(xs.min()) + float(xs.max())) / 2.0
+    mask_center_y = (float(ys.min()) + float(ys.max())) / 2.0
+    box_center_x = (x_min + x_max) / 2.0
+    box_center_y = (y_min + y_max) / 2.0
+    center_distance = np.hypot(
+        (mask_center_x - box_center_x) / max(1, width),
+        (mask_center_y - box_center_y) / max(1, height),
+    )
+    return intersection, overlap, float(center_distance)
 
 
 def _run_qwen_verified_text_prompts(
@@ -153,16 +163,21 @@ def _run_qwen_verified_text_prompts(
     def global_key(candidate: dict[str, Any]) -> tuple[Any, ...]:
         matched = 0
         overlap_sum = 0.0
+        center_distance_sum = 0.0
+        compared = 0
         for frame_index, box in grounding.items():
             mask = candidate["masks"].get(frame_index)
             if box is None or mask is None:
                 continue
-            intersection, overlap = _box_overlap(mask, box, coordinate_scale)
+            intersection, overlap, center_distance = _box_match(mask, box, coordinate_scale)
             matched += int(intersection > 0)
             overlap_sum += overlap
+            center_distance_sum += center_distance
+            compared += 1
         return (
             -matched,
             -overlap_sum,
+            center_distance_sum / max(1, compared),
             -len(candidate["masks"]),
             -candidate["native_rank"],
             candidate["prompt_index"],
@@ -174,7 +189,7 @@ def _run_qwen_verified_text_prompts(
     global_candidate = ordered[0]
     masks: dict[int, np.ndarray] = {}
     selected_sources = []
-    rejected = 0
+    disjoint = 0
     for frame_index in range(frame_count):
         box = grounding[frame_index]
         available = [candidate for candidate in candidates if frame_index in candidate["masks"]]
@@ -182,21 +197,21 @@ def _run_qwen_verified_text_prompts(
         if box is not None and available:
             grounded = []
             for candidate in available:
-                intersection, overlap = _box_overlap(
+                intersection, overlap, center_distance = _box_match(
                     candidate["masks"][frame_index], box, coordinate_scale,
                 )
-                if intersection > 0:
-                    grounded.append((
-                        -overlap,
-                        candidate_order[id(candidate)],
-                        candidate["prompt_index"],
-                        candidate["object_id"],
-                        candidate,
-                    ))
-            if grounded:
-                selected = min(grounded)[-1]
-            else:
-                rejected += 1
+                grounded.append((
+                    -int(intersection > 0),
+                    -overlap,
+                    center_distance,
+                    candidate_order[id(candidate)],
+                    candidate["prompt_index"],
+                    candidate["object_id"],
+                    candidate,
+                ))
+            selected_row = min(grounded)
+            selected = selected_row[-1]
+            disjoint += int(selected_row[0] == 0)
         elif box is None and frame_index in global_candidate["masks"]:
             selected = global_candidate
         if selected is not None:
@@ -213,7 +228,7 @@ def _run_qwen_verified_text_prompts(
         "candidate_prompts": unique_prompts,
         "visible_frame_count": len(masks),
         "grounded_frame_count": sum(box is not None for box in grounding.values()),
-        "qwen_rejected_frame_count": rejected,
+        "qwen_disjoint_frame_count": disjoint,
         "alternate_candidate_frame_count": sum(source != global_source for source in selected_sources),
     }
 
