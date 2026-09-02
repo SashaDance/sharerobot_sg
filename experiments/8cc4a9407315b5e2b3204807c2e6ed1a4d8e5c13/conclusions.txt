@@ -1,0 +1,49 @@
+Experiment: five-frame Qwen box tracks grounded by chunk-local SAM2.1
+Commit: 8cc4a9407315b5e2b3204807c2e6ed1a4d8e5c13
+Comparison: 19b6df26a57d635de8f54da2f7ebe11d1cac9cd6 (Qwen boxes used only as a soft verifier over SAM3 text candidates)
+Outcome count: 5 fully successful, 3 partially successful, and 3 unsuccessful.
+
+Automated result
+----------------
+The cached Qwen role and five-frame box tracks from the comparison run were kept fixed. SAM2.1 used every non-null Qwen box as a conditioning prompt and propagated only within independent five-frame blocks. SAM, graph, trajectory, render, and structural validation completed for all 11 scenes; validation reports 11 successes and 0 failures. Existing DA3 reconstructions were reused unchanged and trajectories were not part of the visual verdict.
+
+Visual assessment by scene
+--------------------------
+9 ASU table top / episode 103 — fully successful
+The manipulated can and robot remain tracked through the complete pickup. The graph now contains reach/grab/lift/move, changes to robot-holding-can, and ends with the can on the target table. Initial support and target are the same physical table, which is redundant but consistent with this goal.
+
+11 UTokyo xArm pick and place / episode 12 — fully successful
+The white moved plate and red target plate remain distinct, and the complete reach/grab/lift/move/stack/release sequence ends with the correct plate-on-plate relation. SAM2 adds visible noise to the large table and robot masks, but the task entities and graph remain usable.
+
+15 DLR SARA grid clamp / episode 100 — unsuccessful
+Qwen supplies a manipulated-object box in only one five-frame block, and the resulting mask follows the wrist/gripper region rather than a single clamp. The graph stays static with no actions or target relation.
+
+17 DLR SARA pour / episode 55 — partially successful
+The brown source cup and black rear support improve from 7/30 to 30/30 visible frames, while robot and target mug remain stable. The graph nevertheless contains no states or pour action, so the recovered masks do not yet produce a successful semantic result.
+
+18 DLR EDAN shared control / episode 86 — fully successful
+The red mug and robot are stable, the initial mug-on-glass-table state is correct, and reach/grab/lift/move ends with robot-holding-mug. The broad support box can switch to nearby furniture after the pickup, but it is no longer used by the final state.
+
+19 UCSD pick and place / episode 492 — partially successful
+Robot, small red cylinder, and table masks are usable, with cylinder coverage increasing to 25/30 frames. Graph inference regresses to a stale cylinder-on-table state and emits no actions despite the visible pickup.
+
+28 VIOLA / episode 0 — fully successful
+SAM2 recovers the lazy-Susan support that SAM3 missed, and the bowl/plate/robot tracks remain usable through occlusion. The graph gives the complete manipulation sequence and the correct final bowl-on-plate relation. Large support and plate masks are coarser than SAM3.
+
+49 Bridge / episode 10144 — partially successful
+The potato improves from 14/30 to 30/30 visible frames and remains distinct from the board and bowl. The final potato-inside-bowl state is correct, but explicit actions are still absent.
+
+57 FMB / episode 141 — unsuccessful
+Coverage rises for both the manipulated entity and target, and Qwen emits a complete insertion action sequence. However, the upstream role pass calls the manipulated object an orange cylinder for a blue-cylinder goal and grounds the target box on the long rail/fixture rather than a valid receiving slot; no correct final state is produced.
+
+60 PLEX RoboSuite / episode 109 — fully successful
+Robot, red cube, green target cube, and table are tracked throughout the interaction. The graph now contains reach/grab/lift/move/place/release and ends with the red cube on the green cube.
+
+62 RoboSet / episode 10976 — unsuccessful
+SAM2 converts all Qwen boxes into masks, but the manipulated box follows a paper-like object rather than a reliable banana and the target remains incorrectly identified as a laptop instead of the bowl named by the goal. The final graph is empty, which is more honest than the prior hallucinated sequence but not task-valid.
+
+Conclusion
+----------
+Chunk-local SAM2 is a real improvement over using Qwen boxes only to rank SAM3 text tracks: it recovers missing small-object/support coverage and improves the visual outcome count from 1/6/4 to 5/3/3. It also exposes two separate remaining limits. First, SAM2 masks from coarse boxes are noisier than good SAM3 text masks, especially for tables and articulated robots. Second, SAM2 cannot repair an incorrect Qwen role or box, as seen in FMB and RoboSet.
+
+The next low-risk global experiment is a precision-first hybrid: keep the Qwen-verified SAM3 mask whenever it exists and use chunk-local SAM2 only for missing frames. This should preserve SAM3's cleaner masks while retaining the DLR Pour, VIOLA, Bridge, and other coverage recoveries. Wrong-role cases should remain reported rather than repaired per episode.
