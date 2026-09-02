@@ -510,29 +510,38 @@ def _run_sam2_qwen_box_chunks(
     }
 
 
-def build_model(config: dict[str, Any]) -> Any:
-    backend = config.get("segmenter", {}).get("backend", "sam3")
-    if backend == "sam2":
-        model_config = config["sam2"]
-        checkpoint = Path(model_config["checkpoint"])
-        if not checkpoint.is_file():
-            raise FileNotFoundError(checkpoint)
-        actual_hash = sha256_path(checkpoint)
-        if actual_hash != model_config["checkpoint_sha256"]:
-            raise ValueError(f"SAM2 checkpoint hash mismatch: {actual_hash}")
-        os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
-        from sam2.build_sam import build_sam2_video_predictor
+def _prefer_primary_masks(
+    primary: dict[int, np.ndarray],
+    fallback: dict[int, np.ndarray],
+) -> tuple[dict[int, np.ndarray], list[int]]:
+    fallback_frames = sorted(set(fallback) - set(primary))
+    merged = dict(fallback)
+    merged.update(primary)
+    return merged, fallback_frames
 
-        return build_sam2_video_predictor(
-            model_config["model_config"],
-            str(checkpoint),
-            device="cuda:0",
-            mode="eval",
-            apply_postprocessing=True,
-            vos_optimized=False,
-        )
-    if backend != "sam3":
-        raise ValueError(f"Unknown segmenter backend: {backend}")
+
+def _build_sam2(config: dict[str, Any]) -> Any:
+    model_config = config["sam2"]
+    checkpoint = Path(model_config["checkpoint"])
+    if not checkpoint.is_file():
+        raise FileNotFoundError(checkpoint)
+    actual_hash = sha256_path(checkpoint)
+    if actual_hash != model_config["checkpoint_sha256"]:
+        raise ValueError(f"SAM2 checkpoint hash mismatch: {actual_hash}")
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+    from sam2.build_sam import build_sam2_video_predictor
+
+    return build_sam2_video_predictor(
+        model_config["model_config"],
+        str(checkpoint),
+        device="cuda:0",
+        mode="eval",
+        apply_postprocessing=True,
+        vos_optimized=False,
+    )
+
+
+def _build_sam3(config: dict[str, Any]) -> Any:
     checkpoint = Path(config["sam3"]["checkpoint"])
     if not checkpoint.is_file():
         raise FileNotFoundError(checkpoint)
@@ -552,6 +561,17 @@ def build_model(config: dict[str, Any]) -> Any:
         device="cuda:0",
         compile=False,
     ).eval()
+
+
+def build_model(config: dict[str, Any]) -> Any:
+    backend = config.get("segmenter", {}).get("backend", "sam3")
+    if backend == "sam2":
+        return _build_sam2(config)
+    if backend == "sam3":
+        return _build_sam3(config)
+    if backend == "sam3_sam2":
+        return {"sam3": _build_sam3(config), "sam2": _build_sam2(config)}
+    raise ValueError(f"Unknown segmenter backend: {backend}")
 
 
 def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model: Any | None = None) -> dict[str, Any]:
@@ -581,7 +601,7 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
     backend = config.get("segmenter", {}).get("backend", "sam3")
     model_config = config[backend]
     prompt_mode = model_config.get("prompt_mode", "text")
-    sam2_jpegs = temporary_root / "_sam2_frames" if backend == "sam2" else None
+    sam2_jpegs = temporary_root / "_sam2_frames" if backend in {"sam2", "sam3_sam2"} else None
     if sam2_jpegs is not None:
         _prepare_sam2_jpegs(frame_paths, sam2_jpegs)
     try:
@@ -635,6 +655,42 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
                             len(frame_paths),
                             int(model_config.get("box_coordinate_scale", 1000)),
                         )
+                    elif backend == "sam3_sam2" and prompt_mode == "qwen_verified_text_with_chunked_box_fallback":
+                        sam3_masks, sam3_track = _run_qwen_verified_text_prompts(
+                            model["sam3"],
+                            frames,
+                            [
+                                entity[field]
+                                for field in config["sam3"].get(
+                                    "candidate_prompts", ["sam_prompt", "canonical_name"],
+                                )
+                            ],
+                            entity["frame_grounding"],
+                            len(frame_paths),
+                            int(config["sam3"].get("box_coordinate_scale", 1000)),
+                        )
+                        sam2_masks, sam2_track = _run_sam2_qwen_box_chunks(
+                            model["sam2"],
+                            sam2_jpegs,
+                            entity["frame_grounding"],
+                            len(frame_paths),
+                            width,
+                            height,
+                            int(config["sam2"].get("box_coordinate_scale", 1000)),
+                            int(config["sam2"].get("tracking_chunk_size", 5)),
+                        )
+                        masks, fallback_frames = _prefer_primary_masks(sam3_masks, sam2_masks)
+                        track = {
+                            "status": "tracked" if masks else "not_found",
+                            "visible_frame_count": len(masks),
+                            "sam3_visible_frame_count": len(sam3_masks),
+                            "sam2_visible_frame_count": len(sam2_masks),
+                            "fallback_frame_count": len(fallback_frames),
+                            "fallback_frame_indices": fallback_frames,
+                            "sam3_candidate_track_count": sam3_track.get("candidate_track_count", 0),
+                            "sam2_grounded_frame_count": sam2_track.get("grounded_frame_count", 0),
+                            "selection_method": "qwen_verified_sam3_then_sam2_only_when_sam3_missing",
+                        }
                     else:
                         raise ValueError(f"Unsupported {backend} prompt mode: {prompt_mode}")
             except Exception as error:
@@ -663,6 +719,8 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
                     "box" if prompt_mode == "qwen_bbox"
                     else "all_frame_boxes"
                     if prompt_mode == "qwen_frame_boxes_chunked"
+                    else "text_with_box_fallback"
+                    if prompt_mode == "qwen_verified_text_with_chunked_box_fallback"
                     else "text_with_qwen_track_verifier"
                     if prompt_mode == "qwen_track_verified_text"
                     else "text"
@@ -686,19 +744,27 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
             "frame_count": len(frame_paths),
             "tracks": track_records,
             "provenance": {
-                "model": "SAM2.1" if backend == "sam2" else "SAM3",
+                "model": (
+                    "SAM3 + SAM2.1 fallback"
+                    if backend == "sam3_sam2"
+                    else "SAM2.1"
+                    if backend == "sam2"
+                    else "SAM3"
+                ),
                 "backend": backend,
                 "source_revision": model_config["source_revision"],
                 "checkpoint_sha256": model_config["checkpoint_sha256"],
                 "selection": (
                     "Qwen boxes as SAM2 conditioning frames in independent temporal chunks"
                     if backend == "sam2" and prompt_mode == "qwen_frame_boxes_chunked"
+                    else "Qwen-verified SAM3 primary; chunked Qwen-box SAM2 only for missing frames"
+                    if backend == "sam3_sam2"
                     else "single Qwen-grounded object track"
                     if backend == "sam2"
                     else "maximum temporal persistence, then mean native ranking, then lower native track id"
                 ),
                 "prompt_mode": prompt_mode,
-                "box_propagation": model_config.get("box_propagation") if prompt_mode in {"qwen_bbox", "qwen_frame_boxes_chunked"} else None,
+                "box_propagation": model_config.get("box_propagation") if prompt_mode in {"qwen_bbox", "qwen_frame_boxes_chunked", "qwen_verified_text_with_chunked_box_fallback"} else None,
                 "config_hash": config_hash(config),
             },
         }

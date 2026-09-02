@@ -22,7 +22,7 @@ from qwen import (  # noqa: E402
 )
 from render import ROLE_COLORS, _draw_frame  # noqa: E402
 from robot_tracking_compare import _config as robot_tracking_config, _diagnostics  # noqa: E402
-from sam_stage import _qwen_box_chunks  # noqa: E402
+from sam_stage import _prefer_primary_masks, _qwen_box_chunks  # noqa: E402
 
 
 def test_prepare_preserves_all_arbitrary_length_rgba_frames(tmp_path: Path) -> None:
@@ -130,6 +130,16 @@ def test_qwen_box_chunks_reject_incomplete_grounding() -> None:
         assert "does not match" in str(error)
     else:
         raise AssertionError("incomplete frame grounding accepted")
+
+
+def test_hybrid_masks_never_replace_primary_frames() -> None:
+    primary = {0: np.asarray([[True, False]]), 2: np.asarray([[False, True]])}
+    fallback = {0: np.asarray([[False, True]]), 1: np.asarray([[True, True]])}
+    merged, fallback_frames = _prefer_primary_masks(primary, fallback)
+    assert np.array_equal(merged[0], primary[0])
+    assert np.array_equal(merged[1], fallback[1])
+    assert np.array_equal(merged[2], primary[2])
+    assert fallback_frames == [1]
 
 
 def test_graph_schema_accepts_honest_empty_or_unchanged_chunks() -> None:

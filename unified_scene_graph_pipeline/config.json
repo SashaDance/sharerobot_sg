@@ -25,7 +25,7 @@
     "candidate_selection": "qwen_overlap_then_center_distance_v2"
   },
   "segmenter": {
-    "backend": "sam2"
+    "backend": "sam3_sam2"
   },
   "sam2": {
     "checkpoint": "/models/sam2.1_hiera_large.pt",
@@ -37,6 +37,18 @@
     "box_propagation": "all_qwen_boxes_bidirectional_chunks_v1",
     "tracking_chunk_size": 5
   },
+  "sam3_sam2": {
+    "prompt_mode": "qwen_verified_text_with_chunked_box_fallback",
+    "box_propagation": "sam3_primary_sam2_missing_frames_only_v1",
+    "source_revision": {
+      "sam3": "86ed77094094e5cabb16b0414ec60c5ba9ce0a0f",
+      "sam2": "2b90b9f5ceec907a1c18123530e92e794ad901a4"
+    },
+    "checkpoint_sha256": {
+      "sam3": "9999e2341ceef5e136daa386eecb55cb414446a00ac2b55eb2dfd2f7c3cf8c9e",
+      "sam2": "2647878d5dfa5098f2f8649825738a9345572bae2d4350a2468587ece47dd318"
+    }
+  },
   "da3": {
     "model_name": "DA3NESTED-GIANT-LARGE-1.1",
     "source_revision": "3d835ec1a5802d64a8b8b15f817a1ab54809bfe4",
@@ -45,8 +57,8 @@
     "checkpoint_sha256": "8ebe871a022ed58d2fc8fdfb2ebdb31d57b60fe39611c849095851a7b7c6020c"
   },
   "render": {
-    "version": "qwen_tracker_sam2_chunks_legend_boundaries_v5",
-    "grounding_label": "SAM2.1 box prompt: Qwen frame box, 5-frame chunks",
+    "version": "sam3_primary_sam2_fallback_legend_boundaries_v6",
+    "grounding_label": "SAM3 Qwen-verified text; SAM2.1 box fallback for missing frames",
     "min_width": 640,
     "mask_alpha": 0.48,
     "boundary_width": 2
