@@ -37,10 +37,10 @@ render artifacts passed the automated validator in every scene.
   relation is accompanied by an unsupported target-on-initial-support relation.
 - PLEX episode 75 loses the manipulated object through a long occlusion. The
   inferred placement is plausible, but 17 trajectory points are invalid.
-- ASU episode 83 is a semantic grounding failure: the goal requests a red box,
-  while the entity pass selects a green bottle that the robot does not
-  manipulate. DLR Clamp episode 17 remains difficult because of repeated
-  instances.
+- ASU episode 83 is sensitive to entity grounding: the 100-scene run names the
+  task object as an orange box, while a later nominally graph-only rerun selects
+  an unrelated green bottle. DLR Clamp episode 17 remains difficult because of
+  repeated instances.
 - DLR EDAN episode 5 and RoboSet episode 5990 do not provide enough visible
   evidence for the requested task. They should be reported as data-eligibility
   failures, not used to justify scene-specific tracker changes.
@@ -53,7 +53,9 @@ render artifacts passed the automated validator in every scene.
    repair. A global SAM2 selection experiment regressed otherwise good robot
    and target tracks.
 3. Continue graph-evidence ablations because some relation errors occur despite
-   usable masks. Evaluate changes on the fixed ten-dataset pilot before any
+   usable masks. Freeze and reuse entity and mask artifacts for these ablations;
+   rerunning Qwen entity extraction confounds a graph-only comparison even at
+   temperature zero. Evaluate changes on the fixed ten-dataset pilot before any
    further 100-scene run.
 4. Add a global role co-reference policy and a separate insufficient-visual-
    evidence status in a later iteration. Neither should silently rewrite an

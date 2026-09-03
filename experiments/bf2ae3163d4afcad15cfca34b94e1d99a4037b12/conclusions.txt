@@ -16,8 +16,14 @@ Automated result
 Every stage completed and validated for all ten scenes. DA3 produced finite
 depth and poses for every frame. Manipulated-object trajectories contain 30/30
 valid points in eight scenes, 11/30 in PLEX episode 75, and 7/30 in RoboSet
-episode 5990. These values match the baseline mask behavior because this is a
-graph-only experiment.
+episode 5990.
+
+Post-run audit found that this was not a clean graph-only comparison: the full
+pipeline reran Qwen entity extraction. Relative to the baseline, it selected an
+unrelated green bottle instead of the task box in ASU, added a target workbench
+in Clamp, and changed PLEX initial support from table to tray. Temperature zero
+does not make the served model bitwise deterministic. Graph differences in
+those scenes therefore cannot be attributed only to the overlay.
 
 Visual assessment by scene
 --------------------------
@@ -74,9 +80,9 @@ available frames. This is a data-eligibility failure.
 
 Decision
 --------
-Reject this overlay as the default. It preserves the Bridge improvement, but it
-does not fix UCSD and regresses VIOLA relative to boundary-only. It also offers
-no reliable gain on the repeated Clamp instance. Restore the proven full-mask
-baseline for current use and stop graph-overlay tuning here; the next useful
-work should address semantic role grounding and role co-reference with evidence
-independent of the segmenter.
+Do not accept this run as evidence for the overlay. It preserves the Bridge
+improvement, but does not fix UCSD and regresses VIOLA relative to boundary-only;
+three of the ten entity specifications also changed. The next comparison must
+reuse frozen baseline entity, mask, and tracking artifacts and rerun only graph
+inference, rendering, and validation. The green-bottle ASU failure is a separate
+entity-grounding failure, not a graph-overlay effect.
