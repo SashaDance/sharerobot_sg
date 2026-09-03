@@ -95,6 +95,27 @@ services:
               device_ids: ["1"]
               capabilities: [gpu]
 
+  reviosa:
+    profiles: [tools]
+    image: woojeongjin/interrvos@sha256:6405558c773b1bdb3251dd6db65bbc975147e6533e9ab447782caac28c9eb8ac
+    entrypoint: ["python", "/pipeline/reviosa_tracking_compare.py"]
+    volumes:
+      - ${DATASET_ROOT:-/datasets}:/datasets:ro
+      - ${RUN_ROOT:-/datasets/unified_scene_graph_runs}:/runs
+      - ${MODEL_ROOT:-/datasets/unified_scene_graph_models}:/models:ro
+      - ./pipeline/reviosa_tracking_compare.py:/pipeline/reviosa_tracking_compare.py:ro
+      - ./reviosa_tracking_config.json:/pipeline/reviosa_tracking_config.json:ro
+      - ./manifests:/manifests:ro
+    ipc: host
+    shm_size: 32gb
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["1"]
+              capabilities: [gpu]
+
   da3:
     profiles: [tools]
     image: unified-sgg-da3:1.0.0

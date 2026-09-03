@@ -1,0 +1,16 @@
+{
+  "schema_version": "unified_sgg_selection_v1",
+  "name": "reviosa_smoke_clamp_and_known_good",
+  "episodes": [
+    {
+      "dataset_name": "15_dlr_sara_grid_clamp_converted_externally_to_rlds",
+      "scene_id": "episode_100",
+      "relative_path": "15_dlr_sara_grid_clamp_converted_externally_to_rlds/episode_100"
+    },
+    {
+      "dataset_name": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds",
+      "scene_id": "episode_12",
+      "relative_path": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds/episode_12"
+    }
+  ]
+}

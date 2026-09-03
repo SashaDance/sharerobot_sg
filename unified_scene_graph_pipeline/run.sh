@@ -110,6 +110,19 @@ case "${1:-}" in
     mv "${MODEL_ROOT}/.sam2.1_hiera_large.pt.tmp" "$target"
     echo "SAM2.1 checkpoint downloaded and verified"
     ;;
+  download-reviosa)
+    require_env
+    set -a
+    # shellcheck disable=SC1090
+    source "$RUNTIME_ENV"
+    set +a
+    mkdir -p "${MODEL_ROOT}"
+    docker run --rm --entrypoint python --env-file "$RUNTIME_ENV" \
+      -v "${MODEL_ROOT}:/models" \
+      -v "$ROOT_DIR/reviosa_model_download.py:/download.py:ro" \
+      woojeongjin/interrvos@sha256:6405558c773b1bdb3251dd6db65bbc975147e6533e9ab447782caac28c9eb8ac \
+      /download.py
+    ;;
   stop-qwen)
     require_env
     "${COMPOSE[@]}" stop qwen qwen-proxy
@@ -141,8 +154,14 @@ case "${1:-}" in
     "${COMPOSE[@]}" run --rm --no-deps -T --entrypoint python core \
       /pipeline/robot_tracking_compare.py render "$@"
     ;;
+  reviosa-track)
+    require_env
+    shift
+    "${COMPOSE[@]}" stop qwen qwen-proxy >/dev/null 2>&1 || true
+    "${COMPOSE[@]}" run --rm --no-deps -T reviosa "$@"
+    ;;
   *)
-    echo "Usage: $0 {build|build-core|build-da3|build-robotseg|download-qwen|download-sam2|start-qwen|start-qwen-tp2|wait-qwen|stop-qwen|prepare|entities|sam|graph|da3|trajectory|render|validate|batch|review-index|robot-track-sam3|robot-track-robotseg|robot-track-render} ..." >&2
+    echo "Usage: $0 {build|build-core|build-da3|build-robotseg|download-qwen|download-sam2|download-reviosa|start-qwen|start-qwen-tp2|wait-qwen|stop-qwen|prepare|entities|sam|graph|da3|trajectory|render|validate|batch|review-index|robot-track-sam3|robot-track-robotseg|robot-track-render|reviosa-track} ..." >&2
     exit 2
     ;;
 esac
