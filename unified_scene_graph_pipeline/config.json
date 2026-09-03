@@ -26,7 +26,15 @@
     "prompt_mode": "qwen_track_verified_text",
     "box_coordinate_scale": 1000,
     "candidate_prompts": ["sam_prompt", "canonical_name"],
-    "candidate_selection": "qwen_overlap_then_center_distance_v2"
+    "candidate_prompt_templates": {
+      "manipulated_object": [
+        "{sam_prompt}",
+        "{canonical_name}",
+        "the individual {canonical_name} manipulated by the robot",
+        "the {canonical_name} that moves with the robot gripper"
+      ]
+    },
+    "candidate_selection": "query_derived_tracks_qwen_overlap_then_center_distance_v3"
   },
   "segmenter": {
     "backend": "sam3_sam2"
@@ -61,8 +69,8 @@
     "checkpoint_sha256": "8ebe871a022ed58d2fc8fdfb2ebdb31d57b60fe39611c849095851a7b7c6020c"
   },
   "render": {
-    "version": "sam3_primary_sam2_fallback_legend_boundaries_v6",
-    "grounding_label": "SAM3 Qwen-verified text; SAM2.1 box fallback for missing frames",
+    "version": "query_derived_sam3_tracks_sam2_fallback_legend_boundaries_v7",
+    "grounding_label": "query-derived SAM3 tracks + Qwen selector; SAM2.1 fallback for missing frames",
     "min_width": 640,
     "mask_alpha": 0.48,
     "boundary_width": 2

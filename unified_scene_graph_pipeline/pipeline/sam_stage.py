@@ -31,6 +31,25 @@ def _as_numpy(value: Any) -> np.ndarray:
     return np.asarray(value)
 
 
+def _candidate_text_prompts(
+    entity: dict[str, Any], model_config: dict[str, Any], planning_goal: str
+) -> list[str]:
+    templates = model_config.get("candidate_prompt_templates", {}).get(entity["role"])
+    if templates is not None:
+        values = {
+            "sam_prompt": entity["sam_prompt"],
+            "canonical_name": entity["canonical_name"],
+            "planning_goal": planning_goal,
+        }
+        prompts = [str(template).format(**values).strip() for template in templates]
+    else:
+        prompts = [
+            str(entity[field]).strip()
+            for field in model_config.get("candidate_prompts", ["sam_prompt", "canonical_name"])
+        ]
+    return list(dict.fromkeys(prompt for prompt in prompts if prompt))
+
+
 def _run_prompt(model: Any, frames: Path, prompt: str, frame_count: int) -> tuple[dict[int, np.ndarray], dict[str, Any]]:
     state = model.init_state(
         resource_path=str(frames),
@@ -645,12 +664,9 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
                         masks, track = _run_qwen_verified_text_prompts(
                             model,
                             frames,
-                            [
-                                entity[field]
-                                for field in model_config.get(
-                                    "candidate_prompts", ["sam_prompt", "canonical_name"],
-                                )
-                            ],
+                            _candidate_text_prompts(
+                                entity, model_config, task["planning_goal"]
+                            ),
                             entity["frame_grounding"],
                             len(frame_paths),
                             int(model_config.get("box_coordinate_scale", 1000)),
@@ -659,12 +675,9 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
                         sam3_masks, sam3_track = _run_qwen_verified_text_prompts(
                             model["sam3"],
                             frames,
-                            [
-                                entity[field]
-                                for field in config["sam3"].get(
-                                    "candidate_prompts", ["sam_prompt", "canonical_name"],
-                                )
-                            ],
+                            _candidate_text_prompts(
+                                entity, config["sam3"], task["planning_goal"]
+                            ),
                             entity["frame_grounding"],
                             len(frame_paths),
                             int(config["sam3"].get("box_coordinate_scale", 1000)),
@@ -688,6 +701,11 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
                             "fallback_frame_count": len(fallback_frames),
                             "fallback_frame_indices": fallback_frames,
                             "sam3_candidate_track_count": sam3_track.get("candidate_track_count", 0),
+                            "sam3_candidate_prompts": sam3_track.get("candidate_prompts", []),
+                            "sam3_selected_prompt": sam3_track.get("selected_prompt"),
+                            "sam3_alternate_candidate_frame_count": sam3_track.get(
+                                "alternate_candidate_frame_count", 0
+                            ),
                             "sam2_grounded_frame_count": sam2_track.get("grounded_frame_count", 0),
                             "selection_method": "qwen_verified_sam3_then_sam2_only_when_sam3_missing",
                         }

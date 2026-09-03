@@ -26,7 +26,33 @@ from qwen import (  # noqa: E402
 )
 from render import ROLE_COLORS, _draw_frame  # noqa: E402
 from robot_tracking_compare import _config as robot_tracking_config, _diagnostics  # noqa: E402
-from sam_stage import _prefer_primary_masks, _qwen_box_chunks  # noqa: E402
+from sam_stage import _candidate_text_prompts, _prefer_primary_masks, _qwen_box_chunks  # noqa: E402
+
+
+def test_role_specific_candidate_prompts_are_global_and_deduplicated() -> None:
+    entity = {
+        "role": "manipulated_object",
+        "canonical_name": "red cube",
+        "sam_prompt": "small red cube",
+    }
+    config = {
+        "candidate_prompts": ["sam_prompt", "canonical_name"],
+        "candidate_prompt_templates": {
+            "manipulated_object": [
+                "{sam_prompt}",
+                "{canonical_name}",
+                "the individual {canonical_name} manipulated by the robot",
+                "{canonical_name}",
+            ]
+        },
+    }
+    assert _candidate_text_prompts(entity, config, "stack a red cube") == [
+        "small red cube",
+        "red cube",
+        "the individual red cube manipulated by the robot",
+    ]
+    support = {"role": "target", "canonical_name": "green cube", "sam_prompt": "green cube"}
+    assert _candidate_text_prompts(support, config, "stack a red cube") == ["green cube"]
 
 
 def test_prepare_preserves_all_arbitrary_length_rgba_frames(tmp_path: Path) -> None:
