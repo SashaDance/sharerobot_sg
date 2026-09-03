@@ -21,8 +21,8 @@
     "entity_reflection_prompt_version": "refer_agent_style_all_frame_reflection_v1",
     "tracking_prompt_version": "unified_sparse_six_anchor_bbox_tracker_v1",
     "graph_mode": "verified_event_timeline",
-    "graph_prompt_version": "verified_persistent_event_timeline_light_fill_boundary_v3",
-    "graph_overlay_mode": "light_fill_boundary_with_markers"
+    "graph_prompt_version": "verified_persistent_event_timeline_v1",
+    "graph_overlay_mode": "filled_with_markers"
   },
   "sam3": {
     "checkpoint": "/models/sam3.pt",
@@ -67,8 +67,8 @@
     "checkpoint_sha256": "8ebe871a022ed58d2fc8fdfb2ebdb31d57b60fe39611c849095851a7b7c6020c"
   },
   "render": {
-    "version": "sparse_six_anchor_hybrid_light_boundary_graph_v12",
-    "grounding_label": "SAM3 text + six Qwen box anchors per 30-frame window; SAM2 gap repair; light-fill boundary graph evidence",
+    "version": "sparse_six_anchor_hybrid_v9",
+    "grounding_label": "SAM3 text + six Qwen box anchors per 30-frame window; SAM2 gap repair",
     "min_width": 640,
     "mask_alpha": 0.48,
     "boundary_width": 2

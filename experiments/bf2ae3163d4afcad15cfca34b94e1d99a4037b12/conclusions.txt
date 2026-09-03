@@ -1,0 +1,82 @@
+Experiment: light-fill plus boundary mask evidence for Qwen graph reasoning
+Source commit: bf2ae3163d4afcad15cfca34b94e1d99a4037b12
+Baseline: 48d934e85ddd8b93a570f647f7f5c103a0dbdd01 on the same scenes
+Outcome count: 3 fully successful, 4 partially successful, and 3 unsuccessful.
+
+Method
+------
+The baseline entity and tracking pipeline is unchanged: Qwen generates six
+sparse box anchors, SAM3 is primary, and SAM2 repairs missing frames. For graph
+reasoning only, entity masks are shown as an 18% color fill plus a strong
+two-pixel boundary. The intention is to retain the boundary-only experiment's
+visibility under large support masks while restoring salience for tiny objects.
+
+Automated result
+----------------
+Every stage completed and validated for all ten scenes. DA3 produced finite
+depth and poses for every frame. Manipulated-object trajectories contain 30/30
+valid points in eight scenes, 11/30 in PLEX episode 75, and 7/30 in RoboSet
+episode 5990. These values match the baseline mask behavior because this is a
+graph-only experiment.
+
+Visual assessment by scene
+--------------------------
+9 ASU TableTop / episode 83 — unsuccessful
+The goal requests a red box, but the entity pass names and tracks a green bottle
+that the robot does not manipulate. The masks are temporally stable but belong
+to the wrong object, so the resulting graph and complete-looking trajectory are
+not valid task evidence.
+
+11 UTokyo xArm / episode 72 — fully successful
+The white plate, red target plate, robot, and support are coherent, and the graph
+captures the transfer and final stack. Endpoint relations match both previous
+graph-overlay variants.
+
+15 DLR SARA Grid Clamp / episode 17 — partially successful
+The repeated clamps make single-instance identity ambiguous. The light fill
+restores the baseline's final holding relation, whereas boundary-only remained
+conservatively on the support. The short clip does not establish a completed
+placement strongly enough to prefer the new result.
+
+17 DLR SARA Pour / episode 0 — fully successful
+The small container, mug, support, robot, and pour interval are coherent. The
+initial and final relations are unchanged from both earlier variants.
+
+18 DLR EDAN / episode 5 — unsuccessful
+The requested tube is not visually established; the tracked blue region does
+not provide reliable evidence that the task object was found. Overlay tuning
+cannot repair this source/grounding failure.
+
+19 UCSD / episode 1026 — partially successful
+The object and robot masks remain usable, but the final graph incorrectly says
+the visibly held red object is still on the initial support. The light fill does
+not recover the correct baseline holding relation.
+
+28 VIOLA / episode 112 — partially successful
+The primary bowl-on-target-plate result is correct. However, the light fill
+restores the baseline's false target-on-lazy-Susan relation, which boundary-only
+had removed.
+
+49 Bridge / episode 9130 — fully successful
+The oven door changes from closed to open and remains part of the whole oven.
+The new result retains boundary-only's improvement of removing an unnecessary
+final robot-touching-door relation.
+
+60 PLEX RoboSuite / episode 75 — partially successful
+The final block-inside-container relation is plausible, but the manipulated
+object is absent from the mask track through a long occlusion. Only 11/30
+trajectory points are valid.
+
+62 RoboSet / episode 5990 — unsuccessful
+The clip shows the relevant robot/object evidence only at the end. Only 7/30
+trajectory points are valid, and the requested action cannot be judged from the
+available frames. This is a data-eligibility failure.
+
+Decision
+--------
+Reject this overlay as the default. It preserves the Bridge improvement, but it
+does not fix UCSD and regresses VIOLA relative to boundary-only. It also offers
+no reliable gain on the repeated Clamp instance. Restore the proven full-mask
+baseline for current use and stop graph-overlay tuning here; the next useful
+work should address semantic role grounding and role co-reference with evidence
+independent of the segmenter.
