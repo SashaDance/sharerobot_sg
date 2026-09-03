@@ -33,6 +33,7 @@ from sam_stage import (  # noqa: E402
     _candidate_text_prompts,
     _prefer_primary_masks,
     _qwen_box_chunks,
+    _select_hybrid_masks,
     _validate_candidate_selection,
 )
 
@@ -272,6 +273,47 @@ def test_hybrid_masks_never_replace_primary_frames() -> None:
     assert np.array_equal(merged[1], fallback[1])
     assert np.array_equal(merged[2], primary[2])
     assert fallback_frames == [1]
+
+
+def test_hybrid_source_selection_prefers_single_box_aligned_instance() -> None:
+    sam3 = {
+        0: np.asarray([
+            [True, True, False, False, True, True],
+            [True, True, False, False, True, True],
+        ]),
+        1: np.asarray([
+            [True, True, False, False, True, True],
+            [True, True, False, False, True, True],
+        ]),
+    }
+    sam2 = {
+        0: np.asarray([
+            [True, True, False, False, False, False],
+            [True, True, False, False, False, False],
+        ]),
+        1: np.asarray([
+            [True, True, False, False, False, False],
+            [True, True, False, False, False, False],
+        ]),
+    }
+    grounding = [
+        {"frame_index": 0, "bbox_xyxy_1000": [0, 0, 334, 1000]},
+        {"frame_index": 1, "bbox_xyxy_1000": [0, 0, 334, 1000]},
+    ]
+    masks, selection = _select_hybrid_masks(sam3, sam2, grounding, 1000)
+    assert selection["selected_source"] == "sam2"
+    assert np.array_equal(masks[0], sam2[0])
+    assert selection["repair_frame_count"] == 0
+
+
+def test_hybrid_source_selection_keeps_sam3_on_exact_tie() -> None:
+    mask = np.asarray([[True, False], [True, False]])
+    grounding = [{"frame_index": 0, "bbox_xyxy_1000": [0, 0, 500, 1000]}]
+    masks, selection = _select_hybrid_masks(
+        {0: mask, 1: mask}, {0: mask}, grounding, 1000,
+    )
+    assert selection["selected_source"] == "sam3"
+    assert np.array_equal(masks[1], mask)
 
 
 def test_graph_schema_accepts_honest_empty_or_unchanged_chunks() -> None:

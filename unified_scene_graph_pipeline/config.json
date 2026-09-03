@@ -47,6 +47,7 @@
   },
   "sam3_sam2": {
     "prompt_mode": "qwen_verified_text_with_chunked_box_fallback",
+    "source_selection": "qwen_anchor_consistency_global_v1",
     "box_propagation": "sam3_primary_sparse_anchor_sam2_missing_frames_only_v1",
     "source_revision": {
       "sam3": "86ed77094094e5cabb16b0414ec60c5ba9ce0a0f",
@@ -65,8 +66,8 @@
     "checkpoint_sha256": "8ebe871a022ed58d2fc8fdfb2ebdb31d57b60fe39611c849095851a7b7c6020c"
   },
   "render": {
-    "version": "sparse_six_anchor_hybrid_v9",
-    "grounding_label": "SAM3 text + six Qwen box anchors per 30-frame window; SAM2 gap repair",
+    "version": "anchor_selected_hybrid_v10",
+    "grounding_label": "six Qwen anchors select SAM3 text or SAM2 box track globally; alternate-source gap repair",
     "min_width": 640,
     "mask_alpha": 0.48,
     "boundary_width": 2

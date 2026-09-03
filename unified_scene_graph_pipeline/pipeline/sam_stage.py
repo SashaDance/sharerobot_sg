@@ -803,6 +803,81 @@ def _prefer_primary_masks(
     return merged, fallback_frames
 
 
+def _select_hybrid_masks(
+    sam3_masks: dict[int, np.ndarray],
+    sam2_masks: dict[int, np.ndarray],
+    frame_grounding: list[dict[str, Any]],
+    coordinate_scale: int,
+) -> tuple[dict[int, np.ndarray], dict[str, Any]]:
+    """Select one temporal source using the existing sparse Qwen anchors.
+
+    SAM3 remains preferable when the two sources agree exactly. Otherwise the
+    source with better aggregate anchor coverage, overlap, and center agreement
+    is selected for the whole track. The other source only repairs missing
+    frames, which avoids frame-wise source flicker and requires no new Qwen call.
+    """
+    anchors = {
+        int(row["frame_index"]): row["bbox_xyxy_1000"]
+        for row in frame_grounding
+        if row.get("bbox_xyxy_1000") is not None
+    }
+
+    def measurements(masks: dict[int, np.ndarray]) -> dict[str, Any]:
+        matched = 0
+        overlap_sum = 0.0
+        center_distance_sum = 0.0
+        compared = 0
+        for frame_index, box in anchors.items():
+            mask = masks.get(frame_index)
+            if mask is None:
+                continue
+            intersection, overlap, center_distance = _box_match(
+                mask, box, coordinate_scale,
+            )
+            matched += int(intersection > 0)
+            overlap_sum += overlap
+            center_distance_sum += center_distance
+            compared += 1
+        return {
+            "matched_anchor_count": matched,
+            "compared_anchor_count": compared,
+            "overlap_sum": round(overlap_sum, 6),
+            "mean_center_distance": (
+                round(center_distance_sum / compared, 6) if compared else None
+            ),
+            "visible_frame_count": len(masks),
+        }
+
+    scores = {
+        "sam3": measurements(sam3_masks),
+        "sam2": measurements(sam2_masks),
+    }
+
+    def selection_key(source: str) -> tuple[Any, ...]:
+        score = scores[source]
+        center_distance = score["mean_center_distance"]
+        return (
+            -score["matched_anchor_count"],
+            -score["overlap_sum"],
+            center_distance if center_distance is not None else float("inf"),
+            -score["compared_anchor_count"],
+            -score["visible_frame_count"],
+            0 if source == "sam3" else 1,
+        )
+
+    selected_source = min(("sam3", "sam2"), key=selection_key)
+    selected = sam3_masks if selected_source == "sam3" else sam2_masks
+    repair = sam2_masks if selected_source == "sam3" else sam3_masks
+    masks, repair_frames = _prefer_primary_masks(selected, repair)
+    return masks, {
+        "selected_source": selected_source,
+        "source_scores": scores,
+        "repair_source": "sam2" if selected_source == "sam3" else "sam3",
+        "repair_frame_count": len(repair_frames),
+        "repair_frame_indices": repair_frames,
+    }
+
+
 def _build_sam2(config: dict[str, Any]) -> Any:
     model_config = config["sam2"]
     checkpoint = Path(model_config["checkpoint"])
@@ -971,7 +1046,38 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
                             int(config["sam2"].get("box_coordinate_scale", 1000)),
                             int(config["sam2"].get("tracking_chunk_size", 5)),
                         )
-                        masks, fallback_frames = _prefer_primary_masks(sam3_masks, sam2_masks)
+                        source_selection = model_config.get(
+                            "source_selection", "sam3_primary_missing_only_v1",
+                        )
+                        if source_selection == "qwen_anchor_consistency_global_v1":
+                            masks, selection = _select_hybrid_masks(
+                                sam3_masks,
+                                sam2_masks,
+                                entity["frame_grounding"],
+                                int(config["sam3"].get("box_coordinate_scale", 1000)),
+                            )
+                            fallback_frames = selection["repair_frame_indices"]
+                            selection_method = (
+                                "qwen_anchor_consistency_selects_sam3_or_sam2_then_gap_repair"
+                            )
+                        elif source_selection == "sam3_primary_missing_only_v1":
+                            masks, fallback_frames = _prefer_primary_masks(
+                                sam3_masks, sam2_masks,
+                            )
+                            selection = {
+                                "selected_source": "sam3",
+                                "source_scores": None,
+                                "repair_source": "sam2",
+                                "repair_frame_count": len(fallback_frames),
+                                "repair_frame_indices": fallback_frames,
+                            }
+                            selection_method = (
+                                "qwen_verified_sam3_then_sam2_only_when_sam3_missing"
+                            )
+                        else:
+                            raise ValueError(
+                                f"Unsupported hybrid source selection: {source_selection}"
+                            )
                         track = {
                             "status": "tracked" if masks else "not_found",
                             "visible_frame_count": len(masks),
@@ -979,6 +1085,7 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
                             "sam2_visible_frame_count": len(sam2_masks),
                             "fallback_frame_count": len(fallback_frames),
                             "fallback_frame_indices": fallback_frames,
+                            **selection,
                             "sam3_candidate_track_count": sam3_track.get("candidate_track_count", 0),
                             "sam3_candidate_prompts": sam3_track.get("candidate_prompts", []),
                             "sam3_selected_prompt": sam3_track.get("selected_prompt"),
@@ -986,7 +1093,7 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
                                 "alternate_candidate_frame_count", 0
                             ),
                             "sam2_grounded_frame_count": sam2_track.get("grounded_frame_count", 0),
-                            "selection_method": "qwen_verified_sam3_then_sam2_only_when_sam3_missing",
+                            "selection_method": selection_method,
                         }
                     else:
                         raise ValueError(f"Unsupported {backend} prompt mode: {prompt_mode}")
