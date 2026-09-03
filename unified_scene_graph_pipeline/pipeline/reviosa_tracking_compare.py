@@ -8,7 +8,7 @@ import re
 import shutil
 import subprocess
 import tempfile
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -261,7 +261,7 @@ def _run_scene(
     _save_masks(masks_root / "target", target_masks)
     report = {
         "schema_version": SCHEMA_VERSION,
-        "completed_at": datetime.now(UTC).isoformat(),
+        "completed_at": datetime.now(timezone.utc).isoformat(),
         "relative_path": str(relative),
         "planning_goal": goal,
         "prompt": prompt,
@@ -295,7 +295,7 @@ def run(manifest: Path, source_root: Path, output_root: Path, config_path: Path)
         torch.cuda.empty_cache()
     summary = {
         "schema_version": SCHEMA_VERSION,
-        "completed_at": datetime.now(UTC).isoformat(),
+        "completed_at": datetime.now(timezone.utc).isoformat(),
         "scene_count": len(results),
         "success_count": sum(item["status"] == "success" for item in results),
         "failure_count": sum(item["status"] == "failed" for item in results),
