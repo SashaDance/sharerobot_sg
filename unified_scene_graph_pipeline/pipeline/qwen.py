@@ -670,6 +670,25 @@ def _mask_boundary(mask: Any, width: int = 2) -> Any:
     return boundary
 
 
+def _apply_graph_mask_overlay(
+    pixels: Any,
+    mask: Any,
+    color: Any,
+    mode: str,
+) -> None:
+    import numpy as np
+
+    if mode == "boundary_with_markers":
+        pixels[_mask_boundary(mask)] = color
+    elif mode == "light_fill_boundary_with_markers":
+        pixels[mask] = (0.82 * pixels[mask] + 0.18 * color).astype(np.uint8)
+        pixels[_mask_boundary(mask)] = color
+    elif mode == "filled_with_markers":
+        pixels[mask] = (0.62 * pixels[mask] + 0.38 * color).astype(np.uint8)
+    else:
+        raise ValueError(f"Unsupported graph overlay mode: {mode}")
+
+
 def overlay_frame(
     output: Path,
     task: dict[str, Any],
@@ -688,12 +707,7 @@ def overlay_frame(
         mask = np.asarray(Image.open(mask_path).convert("L")) > 0
         if mask.any():
             color = np.asarray(MASK_COLORS[entity["role"]][0])
-            if mode == "boundary_with_markers":
-                pixels[_mask_boundary(mask)] = color
-            elif mode == "filled_with_markers":
-                pixels[mask] = (0.62 * pixels[mask] + 0.38 * color).astype(np.uint8)
-            else:
-                raise ValueError(f"Unsupported graph overlay mode: {mode}")
+            _apply_graph_mask_overlay(pixels, mask, color, mode)
             ys, xs = np.nonzero(mask)
             markers.append((int(xs.min()), int(ys.min()), MASK_MARKERS[entity["role"]], tuple(color.tolist())))
     rendered = Image.fromarray(pixels)

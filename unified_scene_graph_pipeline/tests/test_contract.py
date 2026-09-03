@@ -15,6 +15,7 @@ from common import ensure_no_confidence, image_paths  # noqa: E402
 from prepare import prepare  # noqa: E402
 from qwen import (  # noqa: E402
     QwenClient,
+    _apply_graph_mask_overlay,
     _mask_boundary,
     contextual_chunks,
     entity_reflection_prompt,
@@ -414,6 +415,19 @@ def test_graph_mask_boundary_preserves_interior_pixels() -> None:
     assert boundary[5, 5]
     assert not boundary[3, 3]
     assert not boundary[0, 0]
+
+
+def test_light_graph_overlay_keeps_interior_visible_and_boundary_strong() -> None:
+    pixels = np.full((9, 9, 3), 100, dtype=np.uint8)
+    mask = np.zeros((9, 9), dtype=bool)
+    mask[2:7, 2:7] = True
+    color = np.asarray([200, 50, 20], dtype=np.uint8)
+    _apply_graph_mask_overlay(
+        pixels, mask, color, "light_fill_boundary_with_markers",
+    )
+    assert pixels[2, 2].tolist() == color.tolist()
+    assert pixels[4, 4].tolist() == [118, 91, 85]
+    assert pixels[0, 0].tolist() == [100, 100, 100]
 
 
 def test_event_graph_rejects_inconsistent_final_state() -> None:
