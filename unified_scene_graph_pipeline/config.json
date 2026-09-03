@@ -5,20 +5,21 @@
     "model": "Qwen/Qwen3.8-27B",
     "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
     "frames_per_request": 30,
-    "tracking_frames_per_request": 5,
+    "tracking_frames_per_request": 6,
     "max_tokens_entities": 1800,
     "max_tokens_entity_reflection": 1800,
     "max_tokens_tracking": 7000,
-    "max_tokens_track_selection": 1200,
     "max_tokens_graph": 4000,
     "retries": 2,
     "temperature": 0.0,
-    "entity_prompt_version": "agent_track_concepts_no_boxes_v1",
-    "agent_concept_pairs_enabled": true,
-    "frame_grounding_enabled": false,
-    "entity_reflection_enabled": false,
+    "entity_prompt_version": "unified_goal_roles_v9",
+    "agent_concept_pairs_enabled": false,
+    "frame_grounding_enabled": true,
+    "box_anchor_strategy": "six_uniform_per_30_frame_window_v1",
+    "box_anchor_count_per_window": 6,
+    "entity_reflection_enabled": true,
     "entity_reflection_prompt_version": "refer_agent_style_all_frame_reflection_v1",
-    "tracking_prompt_version": "unified_five_frame_bbox_tracker_v2",
+    "tracking_prompt_version": "unified_sparse_six_anchor_bbox_tracker_v1",
     "graph_mode": "verified_event_timeline",
     "graph_prompt_version": "verified_persistent_event_timeline_v1"
   },
@@ -26,13 +27,13 @@
     "checkpoint": "/models/sam3.pt",
     "source_revision": "86ed77094094e5cabb16b0414ec60c5ba9ce0a0f",
     "checkpoint_sha256": "9999e2341ceef5e136daa386eecb55cb414446a00ac2b55eb2dfd2f7c3cf8c9e",
-    "prompt_mode": "agent_tracks_qwen_selection",
+    "prompt_mode": "qwen_track_verified_text",
     "box_coordinate_scale": 1000,
-    "candidate_prompts": ["sam_prompt", "broad_noun"],
-    "candidate_selection": "agent_object_track_visual_reasoning_v1"
+    "candidate_prompts": ["sam_prompt", "canonical_name"],
+    "candidate_selection": "qwen_sparse_anchor_overlap_then_center_distance_v1"
   },
   "segmenter": {
-    "backend": "sam3"
+    "backend": "sam3_sam2"
   },
   "sam2": {
     "checkpoint": "/models/sam2.1_hiera_large.pt",
@@ -41,12 +42,12 @@
     "model_config": "configs/sam2.1/sam2.1_hiera_l.yaml",
     "prompt_mode": "qwen_frame_boxes_chunked",
     "box_coordinate_scale": 1000,
-    "box_propagation": "all_qwen_boxes_bidirectional_chunks_v1",
-    "tracking_chunk_size": 5
+    "box_propagation": "sparse_qwen_anchors_bidirectional_30_frame_windows_v1",
+    "tracking_chunk_size": 30
   },
   "sam3_sam2": {
     "prompt_mode": "qwen_verified_text_with_chunked_box_fallback",
-    "box_propagation": "sam3_primary_sam2_missing_frames_only_v1",
+    "box_propagation": "sam3_primary_sparse_anchor_sam2_missing_frames_only_v1",
     "source_revision": {
       "sam3": "86ed77094094e5cabb16b0414ec60c5ba9ce0a0f",
       "sam2": "2b90b9f5ceec907a1c18123530e92e794ad901a4"
@@ -64,8 +65,8 @@
     "checkpoint_sha256": "8ebe871a022ed58d2fc8fdfb2ebdb31d57b60fe39611c849095851a7b7c6020c"
   },
   "render": {
-    "version": "agent_sam3_track_selection_no_boxes_v8",
-    "grounding_label": "SAM3 core/broad instance tracks + Qwen mask-track selector; no boxes",
+    "version": "sparse_six_anchor_hybrid_v9",
+    "grounding_label": "SAM3 text + six Qwen box anchors per 30-frame window; SAM2 gap repair",
     "min_width": 640,
     "mask_alpha": 0.48,
     "boundary_width": 2

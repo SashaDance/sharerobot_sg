@@ -81,3 +81,14 @@ GPU 1. This removes the second Qwen model load and permits SAM3 on GPU 1 to call
 the track-level Qwen selector on GPU 0. The implementation follows AgentRVOS's
 candidate-first principle, but it is an adaptation because the authors have not
 released their inference code.
+
+## Sparse-box experiment
+
+`run_experiment_gpu1.sh` is the strict GPU-1-only runner. Qwen is loaded once
+for all entity/grounding work and once for all graph work; it is never restarted
+per scene and it has no TP=2 fallback. The sparse grounding configuration asks
+for six uniformly spaced Qwen box-or-null anchors per 30-frame window, before
+and after entity reflection. Non-anchor frames are represented explicitly with
+null boxes. SAM3 still propagates text tracks over every frame, the sparse boxes
+select the intended native instance, and SAM2 uses the six anchors in one
+30-frame temporal window only to fill frames missing from SAM3.

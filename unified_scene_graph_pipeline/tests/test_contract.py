@@ -18,6 +18,7 @@ from qwen import (  # noqa: E402
     entity_reflection_prompt,
     expand_event_graph,
     tracking_overlay_frame,
+    sparse_anchor_indices,
     validate_action_document,
     validate_entity_document,
     validate_event_graph_document,
@@ -202,6 +203,13 @@ def test_context_chunks_never_exceed_thirty_images() -> None:
     assert [index for current, _ in chunks for index in current] == list(range(117))
     assert all(len(current) + (previous is not None) <= 30 for current, previous in chunks)
     assert all(previous == current[0] - 1 for current, previous in chunks[1:])
+
+
+def test_sparse_box_anchors_cover_each_thirty_frame_window() -> None:
+    assert sparse_anchor_indices(list(range(30)), 6, 30) == [0, 6, 12, 18, 24, 29]
+    anchors = sparse_anchor_indices(list(range(67)), 6, 30)
+    assert anchors == [0, 6, 12, 18, 24, 29, 30, 36, 42, 48, 54, 59, 60, 62, 63, 64, 65, 66]
+    assert anchors[0] == 0 and anchors[-1] == 66
 
 
 def test_entity_reflection_uses_all_roles_without_confidence(tmp_path: Path) -> None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import math
 import re
 import time
 from pathlib import Path
@@ -39,6 +40,28 @@ def contextual_chunks(indices: list[int], maximum_images: int):
         current = indices[start : start + capacity]
         yield current, previous
         start += len(current)
+
+
+def sparse_anchor_indices(
+    indices: list[int], anchors_per_window: int, window_size: int,
+) -> list[int]:
+    """Choose deterministic uniform box anchors without dropping video frames."""
+    if anchors_per_window < 2:
+        raise ValueError("box_anchor_count_per_window must be at least 2")
+    if window_size < anchors_per_window:
+        raise ValueError("Qwen frame window must be at least the box anchor count")
+    selected: list[int] = []
+    for start in range(0, len(indices), window_size):
+        window = indices[start : start + window_size]
+        if len(window) <= anchors_per_window:
+            selected.extend(window)
+            continue
+        positions = [
+            math.ceil(slot * (len(window) - 1) / (anchors_per_window - 1))
+            for slot in range(anchors_per_window)
+        ]
+        selected.extend(window[position] for position in dict.fromkeys(positions))
+    return selected
 
 
 def data_url(path: Path) -> str:
@@ -345,13 +368,17 @@ def ground_roles_in_chunks(
     indices: list[int],
     tracking_chunk_size: int,
     max_tokens: int,
+    query_indices: list[int] | None = None,
 ) -> tuple[dict[str, list[dict[str, Any]] | None], list[dict[str, Any]]]:
     frame_grounding: dict[str, list[dict[str, Any]] | None] = {
         role: ([] if roles[role] is not None else None) for role in ROLE_NAMES
     }
     audit = []
-    for start in range(0, len(indices), tracking_chunk_size):
-        current = indices[start : start + tracking_chunk_size]
+    requested = indices if query_indices is None else query_indices
+    if not requested or any(index not in indices for index in requested):
+        raise ValueError("Sparse grounding indices must be a non-empty subset of video frames")
+    for start in range(0, len(requested), tracking_chunk_size):
+        current = requested[start : start + tracking_chunk_size]
         prompt = tracking_prompt(goal, roles, current)
         content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
         for index in current:
@@ -368,6 +395,14 @@ def ground_roles_in_chunks(
             if frame_grounding[role] is not None:
                 frame_grounding[role].extend(chunk_tracks[role] or [])
         audit.append({"frames": current, "attempts": attempts})
+    for role in ROLE_NAMES:
+        if frame_grounding[role] is None:
+            continue
+        by_index = {row["frame_index"]: row for row in frame_grounding[role]}
+        frame_grounding[role] = [
+            by_index.get(index, {"frame_index": index, "bbox_xyxy_1000": None})
+            for index in indices
+        ]
     return frame_grounding, audit
 
 
@@ -418,6 +453,11 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
         tracking_chunk_size = int(config["qwen"]["tracking_frames_per_request"])
         if not 1 <= tracking_chunk_size <= int(config["qwen"]["frames_per_request"]):
             raise ValueError("tracking_frames_per_request must be between 1 and frames_per_request")
+        grounding_indices = sparse_anchor_indices(
+            indices,
+            int(config["qwen"].get("box_anchor_count_per_window", len(indices))),
+            int(config["qwen"]["frames_per_request"]),
+        )
         frame_grounding, tracking_audit = ground_roles_in_chunks(
             client,
             context["planning_goal"],
@@ -426,7 +466,10 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
             indices,
             tracking_chunk_size,
             int(config["qwen"]["max_tokens_tracking"]),
+            grounding_indices,
         )
+    else:
+        grounding_indices = []
     initial_frame_grounding = json.loads(json.dumps(frame_grounding))
     reflection_audit = []
     initial_tracking_audit = tracking_audit
@@ -468,6 +511,7 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
             indices,
             tracking_chunk_size,
             int(config["qwen"]["max_tokens_tracking"]),
+            grounding_indices,
         )
     entities = []
     role_map = {}
@@ -504,7 +548,10 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
             "entity_reflection_prompt_version": config["qwen"].get("entity_reflection_prompt_version"),
             "config_hash": config_hash(config),
             "all_frames_used": True,
-            "all_frames_tracked": frame_grounding_enabled,
+            "all_frames_tracked": False,
+            "box_anchor_strategy": config["qwen"].get("box_anchor_strategy"),
+            "box_anchor_indices": grounding_indices,
+            "box_anchor_count": len(grounding_indices),
         },
     }
     write_json_atomic(target, result)
@@ -530,6 +577,8 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
             if frame_grounding_enabled else None
         ),
         "tracking_chunks": tracking_audit,
+        "box_anchor_indices": grounding_indices,
+        "box_anchor_count": len(grounding_indices),
     })
     complete_stage(output, "entities", fingerprint)
     update_run_report(output, "entities", "success", {"entity_count": len(entities)})
