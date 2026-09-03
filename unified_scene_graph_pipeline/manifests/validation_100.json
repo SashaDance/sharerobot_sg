@@ -1,8 +1,10 @@
 {
   "schema_version": "unified_sgg_selection_v1",
-  "name": "validation_100_stratified",
+  "name": "validation_100_equal10_sparse_box_v1",
   "seed": 20260901,
-  "selection": "dataset quotas plus forced task-family and image-resolution coverage; SHA-256 seeded ordering",
+  "selection": "exactly 10 scenes per active manipulation dataset plus forced task-family and image-resolution coverage; SHA-256 seeded ordering",
+  "pipeline_configuration_source": "bdd9615203ace96bdeece23a5aa173653e38db82",
+  "source_root": "/datasets/sharerobot_planning_manipulation_selected",
   "dataset_counts": {
     "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds": 10,
     "15_dlr_sara_grid_clamp_converted_externally_to_rlds": 10,
