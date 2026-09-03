@@ -15,6 +15,7 @@ from common import ensure_no_confidence, image_paths  # noqa: E402
 from prepare import prepare  # noqa: E402
 from qwen import (  # noqa: E402
     QwenClient,
+    _mask_boundary,
     contextual_chunks,
     entity_reflection_prompt,
     expand_event_graph,
@@ -403,6 +404,16 @@ def test_qwen_schema_retry_includes_invalid_response(monkeypatch) -> None:
         "content": '{"events":[["robot","reach_for","manipulated_object"]]}',
     }
     assert "event requires five items" in payloads[1]["messages"][2]["content"]
+
+
+def test_graph_mask_boundary_preserves_interior_pixels() -> None:
+    mask = np.zeros((7, 7), dtype=bool)
+    mask[1:6, 1:6] = True
+    boundary = _mask_boundary(mask, width=1)
+    assert boundary[1, 1]
+    assert boundary[5, 5]
+    assert not boundary[3, 3]
+    assert not boundary[0, 0]
 
 
 def test_event_graph_rejects_inconsistent_final_state() -> None:

@@ -644,7 +644,38 @@ Use the complete ordered sequence to recognize transitions and timing. reach_for
 Do not infer static state relations in this pass. Omit unsupported actions. Do not output confidence, reasoning, coordinates, descriptions, planning steps, or extra fields."""
 
 
-def overlay_frame(output: Path, task: dict[str, Any], frame_index: int) -> bytes:
+def _mask_boundary(mask: Any, width: int = 2) -> Any:
+    import numpy as np
+
+    mask = np.asarray(mask, dtype=bool)
+    padded = np.pad(mask, 1, constant_values=False)
+    eroded = mask.copy()
+    for y_offset in range(3):
+        for x_offset in range(3):
+            eroded &= padded[
+                y_offset : y_offset + mask.shape[0],
+                x_offset : x_offset + mask.shape[1],
+            ]
+    boundary = mask & ~eroded
+    for _ in range(max(0, width - 1)):
+        padded_boundary = np.pad(boundary, 1, constant_values=False)
+        boundary = np.logical_or.reduce([
+            padded_boundary[
+                y_offset : y_offset + mask.shape[0],
+                x_offset : x_offset + mask.shape[1],
+            ]
+            for y_offset in range(3)
+            for x_offset in range(3)
+        ])
+    return boundary
+
+
+def overlay_frame(
+    output: Path,
+    task: dict[str, Any],
+    frame_index: int,
+    mode: str = "filled_with_markers",
+) -> bytes:
     from io import BytesIO
     from PIL import Image, ImageDraw
     import numpy as np
@@ -657,7 +688,12 @@ def overlay_frame(output: Path, task: dict[str, Any], frame_index: int) -> bytes
         mask = np.asarray(Image.open(mask_path).convert("L")) > 0
         if mask.any():
             color = np.asarray(MASK_COLORS[entity["role"]][0])
-            pixels[mask] = (0.62 * pixels[mask] + 0.38 * color).astype(np.uint8)
+            if mode == "boundary_with_markers":
+                pixels[_mask_boundary(mask)] = color
+            elif mode == "filled_with_markers":
+                pixels[mask] = (0.62 * pixels[mask] + 0.38 * color).astype(np.uint8)
+            else:
+                raise ValueError(f"Unsupported graph overlay mode: {mode}")
             ys, xs = np.nonzero(mask)
             markers.append((int(xs.min()), int(ys.min()), MASK_MARKERS[entity["role"]], tuple(color.tolist())))
     rendered = Image.fromarray(pixels)
@@ -671,10 +707,21 @@ def overlay_frame(output: Path, task: dict[str, Any], frame_index: int) -> bytes
     return stream.getvalue()
 
 
-def graph_content(output: Path, prompt: str, task: dict[str, Any], indices: list[int]) -> list[dict[str, Any]]:
+def graph_content(
+    output: Path,
+    prompt: str,
+    task: dict[str, Any],
+    indices: list[int],
+    config: dict[str, Any],
+) -> list[dict[str, Any]]:
     content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
     for index in indices:
-        encoded = base64.b64encode(overlay_frame(output, task, index)).decode("ascii")
+        encoded = base64.b64encode(overlay_frame(
+            output,
+            task,
+            index,
+            config["qwen"].get("graph_overlay_mode", "filled_with_markers"),
+        )).decode("ascii")
         content.extend([
             {"type": "text", "text": f"frame {index}"},
             {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + encoded}},
@@ -931,7 +978,7 @@ def infer_graph(output: Path, config: dict[str, Any], overwrite: bool = False) -
                 prompt += f"\nFrame {previous} is visual context only and MUST NOT appear in event intervals or transitions."
                 prompt += "\nVerified persistent state immediately before this chunk: " + json.dumps(prior_final_state, ensure_ascii=False)
             draft, draft_attempts = client.request(
-                graph_content(output, prompt, task, visual),
+                graph_content(output, prompt, task, visual, config),
                 int(config["qwen"]["max_tokens_graph"]),
                 lambda value, requested=current, expected=prior_final_state: validate_event_graph_document(
                     value, requested, task, config, expected,
@@ -944,7 +991,7 @@ def infer_graph(output: Path, config: dict[str, Any], overwrite: bool = False) -
                 verify_prompt += f"\nFrame {previous} is visual context only and MUST NOT appear in event intervals or transitions."
                 verify_prompt += "\nVerified persistent state immediately before this chunk: " + json.dumps(prior_final_state, ensure_ascii=False)
             verified, verifier_attempts = client.request(
-                graph_content(output, verify_prompt, task, visual),
+                graph_content(output, verify_prompt, task, visual, config),
                 int(config["qwen"]["max_tokens_graph"]),
                 lambda value, requested=current, expected=prior_final_state: validate_event_graph_document(
                     value, requested, task, config, expected,
@@ -968,7 +1015,7 @@ def infer_graph(output: Path, config: dict[str, Any], overwrite: bool = False) -
             visual = ([previous] if previous is not None else []) + current
             state_prompt = state_graph_prompt(context["planning_goal"], task, current, config) + (f"\nFrame {previous} is context only and MUST NOT appear in output." if previous is not None else "")
             chunk_states, attempts = client.request(
-                graph_content(output, state_prompt, task, visual),
+                graph_content(output, state_prompt, task, visual, config),
                 int(config["qwen"]["max_tokens_graph"]),
                 lambda value, requested=current: validate_state_document(value, requested, task, config),
             )
@@ -976,7 +1023,7 @@ def infer_graph(output: Path, config: dict[str, Any], overwrite: bool = False) -
             state_audit.append({"output_frames": current, "visual_frames": visual, "attempts": attempts})
             action_prompt = action_graph_prompt(context["planning_goal"], task, current, config) + (f"\nFrame {previous} is context only and MUST NOT appear in output." if previous is not None else "")
             chunk_actions, attempts = client.request(
-                graph_content(output, action_prompt, task, visual),
+                graph_content(output, action_prompt, task, visual, config),
                 int(config["qwen"]["max_tokens_graph"]),
                 lambda value, requested=current: validate_action_document(value, requested, task, config),
             )
