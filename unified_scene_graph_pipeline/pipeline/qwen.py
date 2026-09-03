@@ -100,11 +100,12 @@ class QwenClient:
         validator: Callable[[dict[str, Any]], Any],
     ) -> tuple[Any, list[dict[str, Any]]]:
         attempts = []
+        messages: list[dict[str, Any]] = [{"role": "user", "content": content}]
         for attempt in range(int(self.config["retries"]) + 1):
             started = time.monotonic()
             payload = {
                 "model": self.config["model"],
-                "messages": [{"role": "user", "content": content}],
+                "messages": messages,
                 "temperature": float(self.config["temperature"]),
                 "max_tokens": max_tokens,
                 "chat_template_kwargs": {"enable_thinking": False, "preserve_thinking": False},
@@ -139,7 +140,20 @@ class QwenClient:
                 return validator(extract_object(raw)), attempts
             except Exception as error:
                 record["validation_error"] = str(error)
-                content = [*content, {"type": "text", "text": f"Your prior JSON was invalid: {error}. Return corrected complete JSON only."}]
+                # Give the model the actual invalid answer when requesting a repair.
+                # Previously, retries mentioned a "prior JSON" without including it,
+                # so the model often regenerated the same malformed structure.
+                messages = [
+                    *messages,
+                    {"role": "assistant", "content": raw},
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Your prior JSON was invalid: {error}. "
+                            "Correct that exact response and return the complete JSON object only."
+                        ),
+                    },
+                ]
         raise RuntimeError(f"Qwen schema failed after {len(attempts)} attempts: {attempts[-1].get('validation_error')}")
 
 
@@ -814,7 +828,10 @@ def validate_event_graph_document(
     events = []
     for event in value["events"]:
         if not isinstance(event, list) or len(event) != 5:
-            raise ValueError(f"Invalid compact event {event}")
+            raise ValueError(
+                "Every compact event must have exactly five items "
+                f"[start_frame,end_frame,actor,action,object_or_null]; got {event}"
+            )
         start, end, actor, action, obj = event
         if (
             not isinstance(start, int) or isinstance(start, bool)

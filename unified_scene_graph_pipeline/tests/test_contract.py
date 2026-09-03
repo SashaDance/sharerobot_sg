@@ -14,6 +14,7 @@ sys.path.insert(0, str(PIPELINE))
 from common import ensure_no_confidence, image_paths  # noqa: E402
 from prepare import prepare  # noqa: E402
 from qwen import (  # noqa: E402
+    QwenClient,
     contextual_chunks,
     entity_reflection_prompt,
     expand_event_graph,
@@ -306,6 +307,60 @@ def test_event_graph_replays_persistent_state_and_action_intervals() -> None:
     assert states[0]["state_edges"] == [{"subject": "robot", "relation": "holding", "object": "manipulated_object"}]
     assert states[-1]["state_edges"] == [{"subject": "manipulated_object", "relation": "on", "object": "target"}]
     assert [item["actions"][0]["action"] for item in actions] == ["move", "move", "place"]
+
+
+def test_qwen_schema_retry_includes_invalid_response(monkeypatch) -> None:
+    class Response:
+        ok = True
+        status_code = 200
+
+        def __init__(self, content: str) -> None:
+            self.content = content
+
+        def json(self) -> dict:
+            return {
+                "choices": [{"message": {"content": self.content}}],
+                "usage": {},
+            }
+
+    payloads = []
+    responses = iter([
+        Response('{"events":[["robot","reach_for","manipulated_object"]]}'),
+        Response('{"events":[[0,1,"robot","reach_for","manipulated_object"]]}'),
+    ])
+
+    def post(_url, headers, json, timeout):
+        payloads.append(json)
+        return next(responses)
+
+    monkeypatch.setenv("INFERENCE_API_KEY", "test-key")
+    monkeypatch.setattr("qwen.requests.post", post)
+    client = QwenClient({
+        "qwen": {
+            "base_url": "http://qwen/v1",
+            "model": "test-model",
+            "retries": 1,
+            "temperature": 0,
+        },
+    })
+
+    def validate(value: dict) -> dict:
+        event = value["events"][0]
+        if len(event) != 5:
+            raise ValueError("event requires five items")
+        return value
+
+    result, attempts = client.request(
+        [{"type": "text", "text": "Return events"}], 100, validate,
+    )
+
+    assert len(attempts) == 2
+    assert result["events"][0][:2] == [0, 1]
+    assert payloads[1]["messages"][1] == {
+        "role": "assistant",
+        "content": '{"events":[["robot","reach_for","manipulated_object"]]}',
+    }
+    assert "event requires five items" in payloads[1]["messages"][2]["content"]
 
 
 def test_event_graph_rejects_inconsistent_final_state() -> None:
