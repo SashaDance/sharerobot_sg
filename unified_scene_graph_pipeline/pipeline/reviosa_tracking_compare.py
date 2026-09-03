@@ -225,7 +225,7 @@ def _render_video(
             [
                 "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
                 "-framerate", str(render["fps"]), "-i", str(temporary / "frame_%06d.jpg"),
-                "-c:v", "libopenh264", "-pix_fmt", "yuv420p", str(temporary_video),
+                "-c:v", "mpeg4", "-q:v", "3", "-pix_fmt", "yuv420p", str(temporary_video),
             ],
             check=True,
         )
