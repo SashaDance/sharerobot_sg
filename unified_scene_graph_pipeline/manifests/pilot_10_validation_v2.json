@@ -1,0 +1,19 @@
+{
+  "schema_version": "unified_sgg_selection_v1",
+  "name": "pilot_10_validation_v2_one_per_active_dataset",
+  "seed": 20260903,
+  "excluded_sources": ["57_fmb"],
+  "selection_strategy": "one fixed scene per active dataset from validation_100; retain representative hard cases for global pipeline ablations",
+  "episodes": [
+    {"dataset_name": "9_asu_table_top_converted_externally_to_rlds", "scene_id": "episode_83", "relative_path": "9_asu_table_top_converted_externally_to_rlds/episode_83"},
+    {"dataset_name": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds", "scene_id": "episode_72", "relative_path": "11_utokyo_xarm_pick_and_place_converted_externally_to_rlds/episode_72"},
+    {"dataset_name": "15_dlr_sara_grid_clamp_converted_externally_to_rlds", "scene_id": "episode_17", "relative_path": "15_dlr_sara_grid_clamp_converted_externally_to_rlds/episode_17"},
+    {"dataset_name": "17_dlr_sara_pour_converted_externally_to_rlds", "scene_id": "episode_0", "relative_path": "17_dlr_sara_pour_converted_externally_to_rlds/episode_0"},
+    {"dataset_name": "18_dlr_edan_shared_control_converted_externally_to_rlds", "scene_id": "episode_5", "relative_path": "18_dlr_edan_shared_control_converted_externally_to_rlds/episode_5"},
+    {"dataset_name": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds", "scene_id": "episode_1026", "relative_path": "19_ucsd_pick_and_place_dataset_converted_externally_to_rlds/episode_1026"},
+    {"dataset_name": "28_viola", "scene_id": "episode_112", "relative_path": "28_viola/episode_112"},
+    {"dataset_name": "49_bridge", "scene_id": "episode_9130", "relative_path": "49_bridge/episode_9130"},
+    {"dataset_name": "60_plex_robosuite", "scene_id": "episode_75", "relative_path": "60_plex_robosuite/episode_75"},
+    {"dataset_name": "62_robo_set", "scene_id": "episode_5990", "relative_path": "62_robo_set/episode_5990"}
+  ]
+}
