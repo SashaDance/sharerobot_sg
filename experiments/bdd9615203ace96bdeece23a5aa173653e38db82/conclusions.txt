@@ -1,0 +1,103 @@
+Experiment: sparse six-anchor Qwen grounding on GPU 1
+Source commit: bdd9615203ace96bdeece23a5aa173653e38db82
+Comparison: 6a92f2661a2123be9ee0d61ff29257801aac002a (dense-box best pipeline)
+Outcome count: 7 fully successful, 1 partially successful, and 2 unsuccessful.
+
+Method
+------
+This experiment restores the best entity, hybrid SAM3/SAM2, and persistent
+event-graph configuration, but replaces dense per-frame Qwen grounding with six
+uniform box-or-null anchors per 30-frame window: frames 0, 6, 12, 18, 24, and
+29. The six anchors are requested once before entity reflection and once after
+reflection. Every non-anchor frame is retained with an explicit null box.
+
+SAM3 still propagates its text-prompted native tracks through every frame. The
+sparse boxes select the intended SAM3 instance, while SAM2 uses all six anchors
+in one 30-frame temporal window and fills only frames missing from SAM3. Graph
+inference, DA3, trajectory generation, rendering, and validation still process
+all 30 frames. There are no episode-specific settings.
+
+The strict runner exposed only physical GPU 1. Qwen was loaded once for the
+complete entity/grounding batch and once for the complete graph batch, never
+once per scene. It provided no TP=2 or GPU-0 fallback.
+
+Efficiency result
+-----------------
+On the same active 10 scenes, audit records show:
+
+                           Dense 6a92f266    Sparse bdd96152    Reduction
+Qwen box request attempts        138                20           85.5%
+Qwen box image-frames            600               120           80.0%
+Cumulative request time       2381.2 s           420.7 s          82.3%
+
+The dense count includes 18 schema/API retry attempts. The sparse run needed
+exactly two successful box requests per scene and no box-request retries. The
+measured grounding time fell from 39m 41s to 7m 01s, saving 32m 41s across the
+pilot. This comparison isolates the Qwen box stage; DA3 and graph cost are
+unchanged.
+
+Automated result
+----------------
+Entity and mask stages completed successfully for all 10 scenes. The first
+graph attempt stopped on an ASU response whose final state did not equal its
+own transition replay after three correction attempts. Resuming the unchanged
+committed graph stage succeeded for ASU and all other scenes. DA3 produced 30
+depth/pose results per scene, and trajectory, render, and validation stages
+finished with 10 successes and 0 failures. This transient graph-schema retry is
+not attributed to sparse grounding.
+
+Visual assessment by scene
+--------------------------
+9 ASU TableTop / episode 103 — partially successful
+Robot, can, and table masks remain stable and the manipulation timeline is
+coherent. Initial support and target are still duplicate nodes for the same
+physical table, so the stated support-to-target change is not meaningful.
+
+11 UTokyo xArm Pick-and-Place / episode 12 — fully successful
+The robot, white plate, green table, and red target plate remain usable. The
+graph follows pickup, transport, stacking on the target plate, and release.
+
+15 DLR SARA Grid Clamp / episode 100 — unsuccessful
+Sparse boxes do not resolve the original single-instance problem: the
+manipulated-object mask corresponds to the repeated clamp row rather than one
+clamp. The graph consequently has no reliable manipulation sequence.
+
+17 DLR SARA Pour / episode 55 — fully successful
+The robot, held cup, rear initial tray, and white target mug remain grounded.
+The graph represents acquisition, transport, and the final pouring action.
+
+18 DLR EDAN Shared Control / episode 86 — fully successful
+The robot, red mug, and glass-table support are stable. The mug changes from on
+the table to robot-held and remains held through the visible transport.
+
+19 UCSD Pick-and-Place / episode 492 — fully successful
+The small red cylinder remains separated from the robot and table. The graph
+correctly removes the initial on-table relation after pickup and retains the
+holding state.
+
+28 VIOLA / episode 0 — fully successful
+The black bowl, lazy Susan, silver plate, and robot remain usable. The graph
+captures the bowl transfer and final on-plate state.
+
+49 Bridge / episode 10144 — fully successful
+The potato, cutting board, orange bowl, and robot remain grounded through
+occlusion. The final potato-inside-bowl relation is present and coherent.
+
+60 PLEX RoboSuite / episode 109 — fully successful
+Both cubes, the table, and robot remain usable despite the 128x128 source. The
+graph captures pickup, transport, and stacking of the manipulated cube on the
+target cube.
+
+62 RoboSet / episode 10976 — unsuccessful
+The planning goal requests a banana and bowl, while the clip visibly performs a
+different manipulation. The selected object/target therefore remain tied to a
+goal-video mismatch that fewer boxes cannot repair.
+
+Conclusion
+----------
+Six uniform anchors preserve the dense pipeline's 7/1/2 visual outcome while
+reducing audited Qwen box attempts by 85.5% and cumulative box-request time by
+82.3%. This configuration supersedes 6a92f266 as the recommended pipeline for
+the current pilot. The remaining failures are not caused by box sparsity:
+Clamp needs single-instance disambiguation, ASU needs role co-reference, and
+RoboSet needs goal-video mismatch handling or a corrected source episode.

@@ -54,7 +54,14 @@ The scripts do not contain a full-1,000 run command. The 100-scene validation mu
 
 ## Current pilot result
 
-Configuration `unified_goal_roles_role_specific_v5` + `unified_split_state_action_v8` completed technical validation for all 11 pilot scenes. Manual semantic outcome: **1 fully successful, 4 partially successful, and 6 unsuccessful**. The split graph pass improves Bridge, EDAN, and UCSD, but regresses FMB and the clamp scene; RoboSet still has an incorrect target role. Consequently, `manifests/validation_100.json` is prepared but has not been launched. See `reports/pilot_v8_failure_summary.json` for the current per-scene assessment.
+The sparse six-anchor configuration at source commit `bdd96152` completed
+technical validation for all 10 active pilot scenes. Manual semantic outcome:
+**7 fully successful, 1 partially successful, and 2 unsuccessful**. It matches
+the dense `6a92f266` visual outcome while reducing audited Qwen box-request
+attempts from 138 to 20 and cumulative box-request time from 2381.2 to 420.7
+seconds. See `experiments/bdd9615203ace96bdeece23a5aa173653e38db82/` for the
+per-scene report and archived visualizations. The 100-scene validation has not
+been launched.
 
 ## Public output tree
 
