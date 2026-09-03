@@ -39,6 +39,7 @@ def _write_json_atomic(path: Path, value: Any) -> None:
         stream.write("\n")
         temporary = Path(stream.name)
     temporary.replace(path)
+    path.chmod(0o644)
 
 
 def _numeric_key(path: Path) -> tuple[int, str]:
@@ -153,11 +154,12 @@ def _diagnostics(masks: list[np.ndarray]) -> dict[str, Any]:
 
 def _save_masks(directory: Path, masks: list[np.ndarray]) -> None:
     temporary = Path(tempfile.mkdtemp(prefix=f".{directory.name}.", dir=directory.parent))
+    temporary.chmod(0o755)
     try:
         for index, mask in enumerate(masks):
-            Image.fromarray(mask.astype(np.uint8) * 255, mode="L").save(
-                temporary / f"frame_{index:06d}.png"
-            )
+            path = temporary / f"frame_{index:06d}.png"
+            Image.fromarray(mask.astype(np.uint8) * 255, mode="L").save(path)
+            path.chmod(0o644)
         if directory.exists():
             shutil.rmtree(directory)
         temporary.replace(directory)
@@ -223,7 +225,7 @@ def _render_video(
             [
                 "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
                 "-framerate", str(render["fps"]), "-i", str(temporary / "frame_%06d.jpg"),
-                "-c:v", "libx264", "-pix_fmt", "yuv420p", str(temporary_video),
+                "-c:v", "libopenh264", "-pix_fmt", "yuv420p", str(temporary_video),
             ],
             check=True,
         )
