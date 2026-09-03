@@ -1,0 +1,72 @@
+Experiment: query-derived, interaction-aware SAM3 prompt candidates
+Source commit: dc8484253cdeb22e14e435fde770511a07e5cdaa
+Comparison: 6a92f2661a2123be9ee0d61ff29257801aac002a
+Outcome count: 7 fully successful, 1 partially successful, and 2 unsuccessful.
+
+Method
+------
+For the manipulated object only, SAM3 received four global text candidates: the
+original visual prompt, the canonical name, "the individual <object> manipulated
+by the robot", and "the <object> that moves with the robot gripper". The existing
+all-frame Qwen selector chose among native SAM3 tracks. This tests the object-first
+candidate-and-prune idea used by AgentRVOS without episode-specific prompts or
+rules. Task specifications, graph predictions, and DA3 outputs were held fixed;
+SAM3, the mask-dependent trajectory, rendering, and validation were rerun.
+
+Automated result
+----------------
+All ten active pilot scenes completed validation. Manipulated-object mask pixels
+changed in DLR Pour, DLR EDAN, UCSD, and RoboSet. The other six scenes were
+pixel-identical to the baseline. The clamp scene still exposed only one native
+SAM3 candidate, so relational wording could not recover a single clamp instance.
+
+Visual assessment by scene
+--------------------------
+9 ASU table top / episode 103 — partially successful
+The can, robot, and table masks remain usable, but initial_support and target are
+still duplicate nodes for the same physical table. No mask pixels changed.
+
+11 UTokyo xArm pick and place / episode 12 — fully successful
+The white plate, red target plate, support, and robot remain correctly tracked.
+No mask pixels changed.
+
+15 DLR SARA grid clamp / episode 100 — unsuccessful
+The manipulated-object mask still covers the entire repeated clamp row rather
+than one clamp. All candidate phrases collapse to the same native SAM3 track.
+
+17 DLR SARA pour / episode 55 — fully successful
+The cup remains correctly tracked through pickup and pouring. One-frame mask
+difference is visually negligible and does not change the verdict.
+
+18 DLR EDAN shared control / episode 86 — fully successful
+The interaction-aware prompt is selected on part of the sequence and retains a
+coherent mug track through grasp and transport. The result remains successful.
+
+19 UCSD pick and place / episode 492 — fully successful
+The interaction-aware prompt produces a clean red-cylinder track during pickup
+and lift. This is a small local refinement over an already successful scene.
+
+28 VIOLA / episode 0 — fully successful
+The bowl and destination plate remain correctly tracked. No mask pixels changed.
+
+49 Bridge / episode 10144 — fully successful
+The potato and target bowl remain correctly tracked through placement. No mask
+pixels changed.
+
+60 PLEX RoboSuite / episode 109 — fully successful
+The red cube and green target cube remain correctly tracked. No mask pixels
+changed.
+
+62 RoboSet / episode 10976 — unsuccessful
+The known goal/video mismatch and incorrect laptop target remain. The relational
+object prompt additionally drifts from the banana onto the robot arm late in the
+clip, so the scene is not task-valid.
+
+Conclusion
+----------
+The aggregate outcome is unchanged from the active 10-scene baseline: 7/1/2.
+The method provides a small improvement in UCSD and a usable alternative in EDAN,
+but cannot create the missing single-instance clamp proposal and regresses on
+RoboSet. Do not adopt these extra prompts as the default. The next improvement
+requires an actual instance-track proposal mechanism or independent temporal
+verifier, not more SAM3 text paraphrases.
