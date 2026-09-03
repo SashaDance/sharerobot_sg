@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gc
+import colorsys
 import os
 import shutil
 import tempfile
@@ -10,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from common import (
     complete_stage,
@@ -91,6 +92,269 @@ def _run_prompt(model: Any, frames: Path, prompt: str, frame_count: int) -> tupl
         "candidate_track_count": len(candidates),
         "visible_frame_count": len(candidates[selected]),
     }
+
+
+def _collect_prompt_candidates(
+    model: Any, frames: Path, prompt: str, frame_count: int,
+) -> list[dict[str, Any]]:
+    state = model.init_state(
+        resource_path=str(frames),
+        offload_video_to_cpu=True,
+        async_loading_frames=False,
+        video_loader_type="cv2",
+    )
+    model.add_prompt(state, frame_idx=0, text_str=prompt)
+    masks_by_object: dict[int, dict[int, np.ndarray]] = defaultdict(dict)
+    ranks: dict[int, list[float]] = defaultdict(list)
+    try:
+        for frame_index, output in model.propagate_in_video(
+            state,
+            start_frame_idx=0,
+            max_frame_num_to_track=frame_count,
+            reverse=False,
+        ):
+            object_ids = _as_numpy(output["out_obj_ids"]).reshape(-1)
+            masks = _as_numpy(output["out_binary_masks"])
+            native_ranks = _as_numpy(output["out_probs"]).reshape(-1)
+            for index, object_id in enumerate(object_ids):
+                mask = np.asarray(masks[index]).squeeze().astype(bool)
+                if mask.any():
+                    masks_by_object[int(object_id)][int(frame_index)] = mask
+                    ranks[int(object_id)].append(float(native_ranks[index]))
+    finally:
+        del state
+    return [
+        {
+            "object_id": object_id,
+            "masks": masks_by_object[object_id],
+            "native_rank": sum(ranks[object_id]) / max(1, len(ranks[object_id])),
+        }
+        for object_id in sorted(masks_by_object)
+    ]
+
+
+def _candidate_color(index: int) -> tuple[int, int, int]:
+    hue = (index * 0.618033988749895) % 1.0
+    return tuple(round(channel * 255) for channel in colorsys.hsv_to_rgb(hue, 0.78, 1.0))
+
+
+def _candidate_overlay(
+    frame_path: Path,
+    candidates: list[dict[str, Any]],
+    frame_index: int,
+) -> bytes:
+    image = Image.open(frame_path).convert("RGBA")
+    height, width = image.height, image.width
+    for candidate_index, candidate in enumerate(candidates):
+        mask = candidate["masks"].get(frame_index)
+        if mask is None or not mask.any():
+            continue
+        if mask.shape != (height, width):
+            mask = np.asarray(
+                Image.fromarray(mask.astype(np.uint8) * 255).resize(
+                    (width, height), Image.Resampling.NEAREST,
+                )
+            ) > 0
+        color = _candidate_color(candidate_index)
+        alpha = Image.fromarray(mask.astype(np.uint8) * 92, mode="L")
+        fill = Image.new("RGBA", image.size, (*color, 0))
+        fill.putalpha(alpha)
+        image = Image.alpha_composite(image, fill)
+
+        up = np.zeros_like(mask)
+        down = np.zeros_like(mask)
+        left = np.zeros_like(mask)
+        right = np.zeros_like(mask)
+        up[1:] = mask[:-1]
+        down[:-1] = mask[1:]
+        left[:, 1:] = mask[:, :-1]
+        right[:, :-1] = mask[:, 1:]
+        boundary = mask & ~(up & down & left & right)
+        boundary_alpha = Image.fromarray(boundary.astype(np.uint8) * 255, mode="L")
+        outline = Image.new("RGBA", image.size, (*color, 0))
+        outline.putalpha(boundary_alpha)
+        image = Image.alpha_composite(image, outline)
+
+        ys, xs = np.nonzero(mask)
+        x1, y1, x2, y2 = int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())
+        draw = ImageDraw.Draw(image)
+        draw.rectangle((x1, y1, x2, y2), outline=(*color, 255), width=2)
+        label = f"C{candidate_index}"
+        label_box = draw.textbbox((x1, y1), label)
+        draw.rectangle(label_box, fill=(0, 0, 0, 220))
+        draw.text((x1, y1), label, fill=(*color, 255))
+    from io import BytesIO
+
+    payload = BytesIO()
+    image.convert("RGB").save(payload, format="PNG")
+    return payload.getvalue()
+
+
+def _validate_candidate_selection(
+    value: dict[str, Any], candidate_ids: list[str],
+) -> dict[str, Any]:
+    if set(value) != {"decisions", "selected_candidate_id"}:
+        raise ValueError("Expected only decisions and selected_candidate_id")
+    decisions = value["decisions"]
+    if not isinstance(decisions, list) or len(decisions) != len(candidate_ids):
+        raise ValueError("Expected exactly one decision per candidate")
+    normalized = []
+    seen = set()
+    for decision in decisions:
+        if not isinstance(decision, dict) or set(decision) != {"candidate_id", "decision"}:
+            raise ValueError("Each decision must contain candidate_id and decision")
+        candidate_id = decision["candidate_id"]
+        label = decision["decision"]
+        if candidate_id not in candidate_ids or candidate_id in seen:
+            raise ValueError(f"Invalid or duplicate candidate id: {candidate_id}")
+        if label not in {"accepted", "rejected", "uncertain"}:
+            raise ValueError(f"Invalid candidate decision: {label}")
+        seen.add(candidate_id)
+        normalized.append({"candidate_id": candidate_id, "decision": label})
+    if seen != set(candidate_ids):
+        raise ValueError("Candidate decisions are incomplete")
+    selected = value["selected_candidate_id"]
+    if selected is not None and selected not in candidate_ids:
+        raise ValueError("Selected candidate id is invalid")
+    if selected is not None and next(
+        row["decision"] for row in normalized if row["candidate_id"] == selected
+    ) == "rejected":
+        raise ValueError("Selected candidate cannot be rejected")
+    return {"decisions": normalized, "selected_candidate_id": selected}
+
+
+def _agent_selection_prompt(
+    planning_goal: str,
+    entity: dict[str, Any],
+    candidates: list[dict[str, Any]],
+    frame_indices: list[int],
+) -> str:
+    temporal = {
+        f"C{index}": sorted(candidate["masks"])
+        for index, candidate in enumerate(candidates)
+    }
+    role_rules = {
+        "robot": "Select the complete robot arm, excluding manipulated objects and background fixtures.",
+        "manipulated_object": "Select the single physical instance whose position or state changes because of the robot; use grasp, shared motion, and release evidence across time.",
+        "initial_support": "Select the surface or receptacle supporting the manipulated object in the earliest visible state.",
+        "target": "Select the visible destination surface or receptacle involved in the final interaction; reject objects mentioned by a conflicting goal but not supported by the video.",
+        "whole_parent": "Select the whole articulated parent containing the manipulated part.",
+    }
+    return f"""You select one SAM3 instance track for a fixed robot-task role.
+Planning goal: {planning_goal}
+Role: {entity['role']}
+Canonical identity: {entity['canonical_name']}
+Core concept: {entity['sam_prompt']}
+Broader concept: {entity.get('broad_sam_prompt', entity['sam_prompt'])}
+Frames shown: {frame_indices}
+Candidate temporal existence: {temporal}
+{role_rules[entity['role']]}
+
+Every candidate is marked consistently as C0, C1, and so on with a colored mask, boundary, and box. Judge the same track over the complete ordered sequence. Classify every candidate as accepted, rejected, or uncertain, then select exactly one best candidate. Return null only if no candidate represents the requested role. Do not infer spatial boxes and do not merge candidates.
+
+Return exactly:
+{{"decisions":[{{"candidate_id":"C0","decision":"accepted|rejected|uncertain"}}],"selected_candidate_id":"C0" or null}}"""
+
+
+def _run_agent_track_selection(
+    model: Any,
+    frames: Path,
+    entity: dict[str, Any],
+    planning_goal: str,
+    frame_count: int,
+    config: dict[str, Any],
+) -> tuple[dict[int, np.ndarray], dict[str, Any], list[dict[str, Any]]]:
+    core_prompt = entity["sam_prompt"].strip()
+    broad_prompt = entity.get("broad_sam_prompt", core_prompt).strip()
+    concepts = list(dict.fromkeys([core_prompt, broad_prompt]))
+    pools = {
+        prompt: _collect_prompt_candidates(model, frames, prompt, frame_count)
+        for prompt in concepts
+    }
+    selected_concept = max(concepts, key=lambda prompt: len(pools[prompt]))
+    candidates = pools[selected_concept]
+    if not candidates:
+        return {}, {
+            "status": "not_found",
+            "selection_method": "agent_sam3_tracks_qwen_visual_pruning_no_boxes",
+            "core_concept": core_prompt,
+            "broad_concept": broad_prompt,
+            "selected_concept": selected_concept,
+            "core_candidate_count": len(pools[core_prompt]),
+            "broad_candidate_count": len(pools[broad_prompt]),
+            "candidate_track_count": 0,
+            "selected_candidate_id": None,
+        }, []
+
+    from qwen import QwenClient, contextual_chunks, png_data_url
+
+    client = QwenClient(config)
+    candidate_ids = [f"C{index}" for index in range(len(candidates))]
+    indices = list(range(frame_count))
+    audits = []
+    selections = []
+    for current, previous in contextual_chunks(
+        indices, int(config["qwen"]["frames_per_request"]),
+    ):
+        visual_indices = ([previous] if previous is not None else []) + current
+        content: list[dict[str, Any]] = [{
+            "type": "text",
+            "text": _agent_selection_prompt(
+                planning_goal, entity, candidates, visual_indices,
+            ),
+        }]
+        for frame_index in visual_indices:
+            content.extend([
+                {"type": "text", "text": f"frame {frame_index}"},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": png_data_url(_candidate_overlay(
+                        frames / f"frame_{frame_index:06d}.png",
+                        candidates,
+                        frame_index,
+                    ))},
+                },
+            ])
+        decision, attempts = client.request(
+            content,
+            int(config["qwen"]["max_tokens_track_selection"]),
+            lambda value: _validate_candidate_selection(value, candidate_ids),
+        )
+        audits.append({
+            "frames": visual_indices,
+            "decision": decision,
+            "attempts": attempts,
+        })
+        if decision["selected_candidate_id"] is not None:
+            selections.append(decision["selected_candidate_id"])
+
+    if selections:
+        selected_id = min(
+            candidate_ids,
+            key=lambda candidate_id: (
+                -selections.count(candidate_id),
+                -len(candidates[int(candidate_id[1:])]["masks"]),
+                -candidates[int(candidate_id[1:])]["native_rank"],
+                int(candidate_id[1:]),
+            ),
+        )
+    else:
+        selected_id = None
+    selected_masks = (
+        candidates[int(selected_id[1:])]["masks"] if selected_id is not None else {}
+    )
+    return selected_masks, {
+        "status": "tracked" if selected_masks else "not_found",
+        "selection_method": "agent_sam3_tracks_qwen_visual_pruning_no_boxes",
+        "core_concept": core_prompt,
+        "broad_concept": broad_prompt,
+        "selected_concept": selected_concept,
+        "core_candidate_count": len(pools[core_prompt]),
+        "broad_candidate_count": len(pools[broad_prompt]),
+        "candidate_track_count": len(candidates),
+        "selected_candidate_id": selected_id,
+        "visible_frame_count": len(selected_masks),
+    }, audits
 
 
 def _box_match(mask: np.ndarray, box: list[int], coordinate_scale: int) -> tuple[int, float, float]:
@@ -617,6 +881,7 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
     temporary_root.chmod(0o755)
     height, width = int(context["height"]), int(context["width"])
     track_records = []
+    track_selection_audits = []
     backend = config.get("segmenter", {}).get("backend", "sam3")
     model_config = config[backend]
     prompt_mode = model_config.get("prompt_mode", "text")
@@ -660,6 +925,20 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
                         )
                     elif backend == "sam3" and prompt_mode == "text":
                         masks, track = _run_prompt(model, frames, entity["sam_prompt"], len(frame_paths))
+                    elif backend == "sam3" and prompt_mode == "agent_tracks_qwen_selection":
+                        masks, track, selection_audit = _run_agent_track_selection(
+                            model,
+                            frames,
+                            entity,
+                            task["planning_goal"],
+                            len(frame_paths),
+                            config,
+                        )
+                        track_selection_audits.append({
+                            "entity_id": entity["entity_id"],
+                            "role": entity["role"],
+                            "chunks": selection_audit,
+                        })
                     elif backend == "sam3" and prompt_mode == "qwen_track_verified_text":
                         masks, track = _run_qwen_verified_text_prompts(
                             model,
@@ -733,6 +1012,10 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
                 "entity_id": entity["entity_id"],
                 "role": entity["role"],
                 "sam_prompt": entity["sam_prompt"],
+                **(
+                    {"broad_sam_prompt": entity["broad_sam_prompt"]}
+                    if "broad_sam_prompt" in entity else {}
+                ),
                 "prompt_type": (
                     "box" if prompt_mode == "qwen_bbox"
                     else "all_frame_boxes"
@@ -741,6 +1024,8 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
                     if prompt_mode == "qwen_verified_text_with_chunked_box_fallback"
                     else "text_with_qwen_track_verifier"
                     if prompt_mode == "qwen_track_verified_text"
+                    else "agent_mask_track_selection_no_boxes"
+                    if prompt_mode == "agent_tracks_qwen_selection"
                     else "text"
                 ),
                 **track,
@@ -779,6 +1064,8 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
                     if backend == "sam3_sam2"
                     else "single Qwen-grounded object track"
                     if backend == "sam2"
+                    else "SAM3 core/broad instance candidates selected from all-frame mask overlays by Qwen"
+                    if prompt_mode == "agent_tracks_qwen_selection"
                     else "maximum temporal persistence, then mean native ranking, then lower native track id"
                 ),
                 "prompt_mode": prompt_mode,
@@ -787,6 +1074,14 @@ def segment(output: Path, config: dict[str, Any], overwrite: bool = False, model
             },
         }
         write_json_atomic(target_tracks, tracks)
+        if prompt_mode == "agent_tracks_qwen_selection":
+            write_json_atomic(output / "qwen_track_selection_audit.json", {
+                "schema_version": "unified_sgg_track_selection_audit_v1",
+                "planning_goal": task["planning_goal"],
+                "all_frames_used": True,
+                "frame_boxes_used": False,
+                "entities": track_selection_audits,
+            })
         complete_stage(output, "sam", fingerprint, {"frame_count": len(frame_paths)})
         update_run_report(output, "sam", "success", {"frame_count": len(frame_paths)})
         return tracks

@@ -66,8 +66,10 @@ def _draw_frame(
     task: dict[str, Any],
     graph: dict[str, Any],
     render_config: dict[str, Any] | None = None,
+    tracks_by_entity: dict[str, dict[str, Any]] | None = None,
 ) -> Image.Image:
     render_config = render_config or {}
+    tracks_by_entity = tracks_by_entity or {}
     mask_alpha = float(render_config.get("mask_alpha", 0.48))
     boundary_width = int(render_config.get("boundary_width", 2))
     min_width = int(render_config.get("min_width", 640))
@@ -134,8 +136,15 @@ def _draw_frame(
         marker = ROLE_MARKERS.get(entity["role"], "?")
         status = "visible" if entity["entity_id"] in visible_entities else "not visible"
         grounding = entity.get("grounding")
+        track = tracks_by_entity.get(entity["entity_id"], {})
         prompt = (
-            str(render_config["grounding_label"])
+            (
+                f"SAM3 core: \"{track.get('core_concept')}\"; broad: "
+                f"\"{track.get('broad_concept')}\"; selected: "
+                f"{track.get('selected_concept')}/{track.get('selected_candidate_id')}"
+            )
+            if track.get("selection_method") == "agent_sam3_tracks_qwen_visual_pruning_no_boxes"
+            else str(render_config["grounding_label"])
             if render_config.get("grounding_label")
             else f"SAM3 text: \"{entity['sam_prompt']}\" + Qwen all-frame verifier"
             if entity.get("frame_grounding") is not None
@@ -197,11 +206,17 @@ def render(output: Path, config: dict[str, Any], overwrite: bool = False) -> dic
     context = read_json(output / "input.json")
     task = read_json(output / "task_spec.json")
     graph = read_json(output / "scene_graph.json")
+    tracks = read_json(output / "tracks.json")
+    tracks_by_entity = {
+        track["entity_id"]: track for track in tracks.get("tracks", [])
+    }
     with tempfile.TemporaryDirectory(prefix="unified_sgg_render_") as temporary_name:
         temporary = Path(temporary_name)
         rendered_frames = []
         for index in range(int(context["frame_count"])):
-            frame = _draw_frame(output, index, task, graph, config.get("render"))
+            frame = _draw_frame(
+                output, index, task, graph, config.get("render"), tracks_by_entity,
+            )
             path = temporary / f"frame_{index:06d}.jpg"
             frame.save(path, quality=92)
             rendered_frames.append(path)

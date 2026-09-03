@@ -120,25 +120,35 @@ class QwenClient:
         raise RuntimeError(f"Qwen schema failed after {len(attempts)} attempts: {attempts[-1].get('validation_error')}")
 
 
-def entity_prompt(goal: str, frame_indices: list[int]) -> str:
+def entity_prompt(
+    goal: str, frame_indices: list[int], include_broad_concepts: bool = False,
+) -> str:
+    entity_shape = (
+        '{"canonical_name":"specific visible name","sam_prompt":"specific short noun phrase",'
+        '"broad_sam_prompt":"broader common object category"}'
+        if include_broad_concepts
+        else '{"canonical_name":"specific visible name","sam_prompt":"short visual description"}'
+    )
     return f"""You identify task entities in ordered robot-manipulation frames.
 Planning goal: {goal}
 The following images are frames {frame_indices} in temporal order.
 Use visual appearance, not hidden annotations. Return exactly this JSON shape:
 {{"roles":{{
- "robot":{{"canonical_name":"specific visible name","sam_prompt":"robot arm"}},
- "manipulated_object":{{"canonical_name":"specific visible name","sam_prompt":"short visual description"}},
- "initial_support":null or {{"canonical_name":"...","sam_prompt":"..."}},
- "target":null or {{"canonical_name":"...","sam_prompt":"..."}},
- "whole_parent":null or {{"canonical_name":"...","sam_prompt":"..."}}
+ "robot":{entity_shape},
+ "manipulated_object":{entity_shape},
+ "initial_support":null or {entity_shape},
+ "target":null or {entity_shape},
+ "whole_parent":null or {entity_shape}
 }},"task_actions":["canonical action labels"]}}
 Allowed task actions: reach_for, grab, lift, move, place, release, push, pour, open, close, insert, stack.
 Robot and manipulated_object must be present. Identify the manipulated object as the physical object whose position or state changes across the ordered frames, using the goal only as context. Initial support is the visible surface or receptacle supporting the manipulated object in the early frames. Target is the visible intended destination surface or receptacle, supported by the goal and the observed motion or final frames. If the goal conflicts with the visible action, trust the video; use null for a target that is neither visible nor supported by the observed action.
 
-Keep visually specific short descriptions: robot sam_prompt must be exactly "robot arm"; other sam_prompt values should normally be a discriminative color plus a common object noun, such as "yellow banana", "brown cup", "red cube", "black clamp", "wooden table", "orange bowl", "silver plate", or "blue container". canonical_name may remain more specific. Do not output points, masks, confidence, planning steps, synonyms, or extra roles."""
+Keep visually specific short descriptions: robot sam_prompt must be exactly "robot arm"; other sam_prompt values should normally be a discriminative color plus a common object noun, such as "yellow banana", "brown cup", "red cube", "black clamp", "wooden table", "orange bowl", "silver plate", or "blue container". canonical_name may remain more specific. When broad_sam_prompt is requested, make it a short, visually grounded super-category that SAM3 can detect exhaustively, such as "robot", "banana", "cup", "cube", "clamp", "table", "bowl", "plate", or "container". It must not contain an action or spatial relation. Do not output points, boxes, masks, confidence, planning steps, synonyms, or extra roles."""
 
 
-def validate_entity_document(value: dict[str, Any]) -> dict[str, Any]:
+def validate_entity_document(
+    value: dict[str, Any], include_broad_concepts: bool = False,
+) -> dict[str, Any]:
     if set(value) != {"roles", "task_actions"}:
         raise ValueError("Expected only roles and task_actions")
     roles = value["roles"]
@@ -150,9 +160,15 @@ def validate_entity_document(value: dict[str, Any]) -> dict[str, Any]:
             if role in {"robot", "manipulated_object"}:
                 raise ValueError(f"Required role {role} is null")
             continue
-        if not isinstance(entity, dict) or set(entity) != {"canonical_name", "sam_prompt"}:
+        expected_fields = {"canonical_name", "sam_prompt"}
+        if include_broad_concepts:
+            expected_fields.add("broad_sam_prompt")
+        if not isinstance(entity, dict) or set(entity) != expected_fields:
             raise ValueError(f"Invalid entity shape for {role}")
-        if not all(isinstance(entity[key], str) and entity[key].strip() for key in ("canonical_name", "sam_prompt")):
+        if not all(
+            isinstance(entity[key], str) and entity[key].strip()
+            for key in expected_fields
+        ):
             raise ValueError(f"Empty entity value for {role}")
     allowed = {"reach_for", "grab", "lift", "move", "place", "release", "push", "pour", "open", "close", "insert", "stack"}
     actions = value["task_actions"]
@@ -217,8 +233,13 @@ def validate_tracking_document(
     return normalized
 
 
-def entity_content(goal: str, frames: Path, indices: list[int]) -> list[dict[str, Any]]:
-    content: list[dict[str, Any]] = [{"type": "text", "text": entity_prompt(goal, indices)}]
+def entity_content(
+    goal: str, frames: Path, indices: list[int], include_broad_concepts: bool = False,
+) -> list[dict[str, Any]]:
+    content: list[dict[str, Any]] = [{
+        "type": "text",
+        "text": entity_prompt(goal, indices, include_broad_concepts),
+    }]
     for index in indices:
         content.extend([
             {"type": "text", "text": f"frame {index}"},
@@ -357,15 +378,19 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
         return read_json(target)
     context = read_json(output / "input.json")
     client = QwenClient(config)
+    include_broad_concepts = bool(config["qwen"].get("agent_concept_pairs_enabled", False))
     indices = list(range(int(context["frame_count"])))
     documents = []
     audit_attempts = []
     for current, previous in contextual_chunks(indices, int(config["qwen"]["frames_per_request"])):
         visual_indices = ([previous] if previous is not None else []) + current
         document, attempts = client.request(
-            entity_content(context["planning_goal"], output / "frames", visual_indices),
+            entity_content(
+                context["planning_goal"], output / "frames", visual_indices,
+                include_broad_concepts,
+            ),
             int(config["qwen"]["max_tokens_entities"]),
-            validate_entity_document,
+            lambda value: validate_entity_document(value, include_broad_concepts),
         )
         documents.append(document)
         audit_attempts.append({"frames": visual_indices, "attempts": attempts})
@@ -380,26 +405,34 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
         merged, attempts = client.request(
             reconciliation,
             int(config["qwen"]["max_tokens_entities"]),
-            validate_entity_document,
+            lambda value: validate_entity_document(value, include_broad_concepts),
         )
         audit_attempts.append({"stage": "reconcile", "attempts": attempts})
-    tracking_chunk_size = int(config["qwen"]["tracking_frames_per_request"])
-    if not 1 <= tracking_chunk_size <= int(config["qwen"]["frames_per_request"]):
-        raise ValueError("tracking_frames_per_request must be between 1 and frames_per_request")
-    frame_grounding, tracking_audit = ground_roles_in_chunks(
-        client,
-        context["planning_goal"],
-        merged["roles"],
-        output,
-        indices,
-        tracking_chunk_size,
-        int(config["qwen"]["max_tokens_tracking"]),
-    )
     initial_proposal = json.loads(json.dumps(merged))
+    frame_grounding_enabled = bool(config["qwen"].get("frame_grounding_enabled", True))
+    frame_grounding: dict[str, list[dict[str, Any]] | None] = {
+        role: None for role in ROLE_NAMES
+    }
+    tracking_audit = []
+    if frame_grounding_enabled:
+        tracking_chunk_size = int(config["qwen"]["tracking_frames_per_request"])
+        if not 1 <= tracking_chunk_size <= int(config["qwen"]["frames_per_request"]):
+            raise ValueError("tracking_frames_per_request must be between 1 and frames_per_request")
+        frame_grounding, tracking_audit = ground_roles_in_chunks(
+            client,
+            context["planning_goal"],
+            merged["roles"],
+            output,
+            indices,
+            tracking_chunk_size,
+            int(config["qwen"]["max_tokens_tracking"]),
+        )
     initial_frame_grounding = json.loads(json.dumps(frame_grounding))
     reflection_audit = []
     initial_tracking_audit = tracking_audit
     if bool(config["qwen"].get("entity_reflection_enabled", False)):
+        if not frame_grounding_enabled:
+            raise ValueError("Box-overlay entity reflection requires frame grounding")
         reflected_documents = []
         for current, previous in contextual_chunks(indices, int(config["qwen"]["frames_per_request"])):
             visual_indices = ([previous] if previous is not None else []) + current
@@ -446,13 +479,15 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
         entity = merged["roles"][role]
         role_map[role] = role if entity else None
         if entity:
-            entities.append({
+            entity_record = {
                 "entity_id": role,
                 "role": role,
                 "entity_kind": kinds[role],
                 **entity,
-                "frame_grounding": frame_grounding[role],
-            })
+            }
+            if frame_grounding_enabled:
+                entity_record["frame_grounding"] = frame_grounding[role]
+            entities.append(entity_record)
     result = {
         "schema_version": "unified_sgg_task_spec_v1",
         "planning_goal": context["planning_goal"],
@@ -464,26 +499,35 @@ def infer_entities(output: Path, config: dict[str, Any], overwrite: bool = False
             "model_revision": config["qwen"]["revision"],
             "prompt_version": config["qwen"]["entity_prompt_version"],
             "tracking_prompt_version": config["qwen"]["tracking_prompt_version"],
+            "frame_grounding_enabled": frame_grounding_enabled,
             "entity_reflection_enabled": bool(config["qwen"].get("entity_reflection_enabled", False)),
             "entity_reflection_prompt_version": config["qwen"].get("entity_reflection_prompt_version"),
             "config_hash": config_hash(config),
             "all_frames_used": True,
-            "all_frames_tracked": True,
+            "all_frames_tracked": frame_grounding_enabled,
         },
     }
     write_json_atomic(target, result)
     write_json_atomic(output / "qwen_entities_audit.json", {
-        "prompt_template": entity_prompt(context["planning_goal"], ["<ordered_frame_indices>"]),
+        "prompt_template": entity_prompt(
+            context["planning_goal"], ["<ordered_frame_indices>"], include_broad_concepts,
+        ),
         "chunks": audit_attempts,
         "initial_proposal": initial_proposal,
         "initial_frame_grounding": initial_frame_grounding,
         "initial_tracking_chunks": initial_tracking_audit,
-        "reflection_prompt_template": entity_reflection_prompt(
-            context["planning_goal"], initial_proposal, ["<ordered_frame_indices>"],
+        "reflection_prompt_template": (
+            entity_reflection_prompt(
+                context["planning_goal"], initial_proposal, ["<ordered_frame_indices>"],
+            )
+            if frame_grounding_enabled else None
         ),
         "reflection_chunks": reflection_audit,
-        "tracking_prompt_template": tracking_prompt(
-            context["planning_goal"], merged["roles"], ["<ordered_frame_indices>"],
+        "tracking_prompt_template": (
+            tracking_prompt(
+                context["planning_goal"], merged["roles"], ["<ordered_frame_indices>"],
+            )
+            if frame_grounding_enabled else None
         ),
         "tracking_chunks": tracking_audit,
     })

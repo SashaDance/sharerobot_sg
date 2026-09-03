@@ -65,3 +65,19 @@ Each scene contains `input.json`, `frames/`, `task_spec.json`, `masks/`, `tracks
 `run_robot_tracking_experiment.sh` is a segmentation-only comparison between the official RobotSeg automatic video mode (`category="robot"`) and SAM3 native video propagation from the single text prompt `robot`. It processes every frame in `manifests/pilot_10.json` and deliberately skips Qwen, all non-robot entities, relations, actions, DA3, and trajectories.
 
 The run writes per-method masks and diagnostics, plus a three-panel `visualization.mp4` and `contact_sheet.png` for every scene. The diagnostics describe temporal mask behavior without ground-truth robot masks; they are not segmentation-accuracy metrics.
+
+## Agent-style no-box experiment
+
+`run_experiment_dual_gpu.sh` implements a training-free AgentRVOS-inspired
+variant without Qwen frame boxes. One all-frame Qwen call extracts a specific
+core concept and a broader noun concept for each role. SAM3 runs both concepts
+over every frame, keeps the concept producing more native instance tracks, and
+renders every candidate with a stable ID, colored mask, and boundary. Qwen then
+classifies the complete candidate tracks and selects one role-consistent track
+from the all-frame overlays. SAM2 is not used in this variant.
+
+The script keeps Qwen resident on physical GPU 0 while SAM3 and DA3 use physical
+GPU 1. This removes the second Qwen model load and permits SAM3 on GPU 1 to call
+the track-level Qwen selector on GPU 0. The implementation follows AgentRVOS's
+candidate-first principle, but it is an adaptation because the authors have not
+released their inference code.

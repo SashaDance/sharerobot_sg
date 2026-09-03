@@ -26,7 +26,13 @@ from qwen import (  # noqa: E402
 )
 from render import ROLE_COLORS, _draw_frame  # noqa: E402
 from robot_tracking_compare import _config as robot_tracking_config, _diagnostics  # noqa: E402
-from sam_stage import _candidate_text_prompts, _prefer_primary_masks, _qwen_box_chunks  # noqa: E402
+from sam_stage import (  # noqa: E402
+    _candidate_overlay,
+    _candidate_text_prompts,
+    _prefer_primary_masks,
+    _qwen_box_chunks,
+    _validate_candidate_selection,
+)
 
 
 def test_role_specific_candidate_prompts_are_global_and_deduplicated() -> None:
@@ -113,6 +119,67 @@ def test_entity_schema_rejects_extra_roles_and_confidence() -> None:
         raise AssertionError("confidence accepted")
     except ValueError:
         pass
+
+
+def test_agent_entity_schema_requires_core_and_broad_concepts() -> None:
+    value = {
+        "roles": {
+            "robot": {
+                "canonical_name": "gray robot arm",
+                "sam_prompt": "robot arm",
+                "broad_sam_prompt": "robot",
+            },
+            "manipulated_object": {
+                "canonical_name": "left black grid clamp",
+                "sam_prompt": "black clamp",
+                "broad_sam_prompt": "clamp",
+            },
+            "initial_support": None,
+            "target": None,
+            "whole_parent": None,
+        },
+        "task_actions": ["move"],
+    }
+    assert validate_entity_document(value, include_broad_concepts=True) == value
+    del value["roles"]["manipulated_object"]["broad_sam_prompt"]
+    try:
+        validate_entity_document(value, include_broad_concepts=True)
+        raise AssertionError("missing broad concept accepted")
+    except ValueError:
+        pass
+
+
+def test_agent_candidate_decisions_are_complete_and_selected_is_not_rejected() -> None:
+    value = {
+        "decisions": [
+            {"candidate_id": "C0", "decision": "rejected"},
+            {"candidate_id": "C1", "decision": "accepted"},
+        ],
+        "selected_candidate_id": "C1",
+    }
+    assert _validate_candidate_selection(value, ["C0", "C1"]) == value
+    value["selected_candidate_id"] = "C0"
+    try:
+        _validate_candidate_selection(value, ["C0", "C1"])
+        raise AssertionError("rejected candidate selected")
+    except ValueError:
+        pass
+
+
+def test_agent_candidate_overlay_marks_every_visible_track(tmp_path: Path) -> None:
+    frame = tmp_path / "frame.png"
+    Image.new("RGB", (40, 30), (100, 100, 100)).save(frame)
+    first = np.zeros((30, 40), dtype=bool)
+    second = np.zeros((30, 40), dtype=bool)
+    first[5:12, 4:11] = True
+    second[16:25, 22:35] = True
+    payload = _candidate_overlay(
+        frame,
+        [{"masks": {0: first}}, {"masks": {0: second}}],
+        0,
+    )
+    assert payload.startswith(b"\x89PNG")
+    assert len(payload) > frame.stat().st_size
 
 
 def test_graph_schema_requires_requested_frames_and_valid_references() -> None:

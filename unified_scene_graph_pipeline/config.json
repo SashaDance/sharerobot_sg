@@ -9,11 +9,14 @@
     "max_tokens_entities": 1800,
     "max_tokens_entity_reflection": 1800,
     "max_tokens_tracking": 7000,
+    "max_tokens_track_selection": 1200,
     "max_tokens_graph": 4000,
     "retries": 2,
     "temperature": 0.0,
-    "entity_prompt_version": "unified_goal_roles_v9",
-    "entity_reflection_enabled": true,
+    "entity_prompt_version": "agent_track_concepts_no_boxes_v1",
+    "agent_concept_pairs_enabled": true,
+    "frame_grounding_enabled": false,
+    "entity_reflection_enabled": false,
     "entity_reflection_prompt_version": "refer_agent_style_all_frame_reflection_v1",
     "tracking_prompt_version": "unified_five_frame_bbox_tracker_v2",
     "graph_mode": "verified_event_timeline",
@@ -23,21 +26,13 @@
     "checkpoint": "/models/sam3.pt",
     "source_revision": "86ed77094094e5cabb16b0414ec60c5ba9ce0a0f",
     "checkpoint_sha256": "9999e2341ceef5e136daa386eecb55cb414446a00ac2b55eb2dfd2f7c3cf8c9e",
-    "prompt_mode": "qwen_track_verified_text",
+    "prompt_mode": "agent_tracks_qwen_selection",
     "box_coordinate_scale": 1000,
-    "candidate_prompts": ["sam_prompt", "canonical_name"],
-    "candidate_prompt_templates": {
-      "manipulated_object": [
-        "{sam_prompt}",
-        "{canonical_name}",
-        "the individual {canonical_name} manipulated by the robot",
-        "the {canonical_name} that moves with the robot gripper"
-      ]
-    },
-    "candidate_selection": "query_derived_tracks_qwen_overlap_then_center_distance_v3"
+    "candidate_prompts": ["sam_prompt", "broad_noun"],
+    "candidate_selection": "agent_object_track_visual_reasoning_v1"
   },
   "segmenter": {
-    "backend": "sam3_sam2"
+    "backend": "sam3"
   },
   "sam2": {
     "checkpoint": "/models/sam2.1_hiera_large.pt",
@@ -69,8 +64,8 @@
     "checkpoint_sha256": "8ebe871a022ed58d2fc8fdfb2ebdb31d57b60fe39611c849095851a7b7c6020c"
   },
   "render": {
-    "version": "query_derived_sam3_tracks_sam2_fallback_legend_boundaries_v7",
-    "grounding_label": "query-derived SAM3 tracks + Qwen selector; SAM2.1 fallback for missing frames",
+    "version": "agent_sam3_track_selection_no_boxes_v8",
+    "grounding_label": "SAM3 core/broad instance tracks + Qwen mask-track selector; no boxes",
     "min_width": 640,
     "mask_alpha": 0.48,
     "boundary_width": 2
