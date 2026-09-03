@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MANIFEST_HOST="${1:-$ROOT_DIR/manifests/pilot_11.json}"
+MANIFEST_HOST="${1:-$ROOT_DIR/manifests/pilot_10.json}"
 SOURCE_ROOT="${2:-/datasets/sharerobot_planning_selected}"
 OUTPUT_ROOT="${3:?usage: run_robot_tracking_experiment.sh [MANIFEST] [SOURCE_ROOT_CONTAINER] OUTPUT_ROOT_CONTAINER}"
 MANIFEST_NAME="$(basename "$MANIFEST_HOST")"

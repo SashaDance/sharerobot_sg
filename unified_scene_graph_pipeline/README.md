@@ -27,7 +27,7 @@ The server runtime file defaults to `/datasets/unified_scene_graph_pipeline.runt
 chmod 600 /datasets/unified_scene_graph_pipeline.runtime.env
 ./run.sh build
 ./run.sh download-qwen
-./run_experiment.sh manifests/pilot_11.json \
+./run_experiment.sh manifests/pilot_10.json \
   /datasets/sharerobot_planning_selected /runs/pilot_v1
 ```
 
@@ -44,7 +44,9 @@ Then run `entities`, `sam`, `graph`, `da3 --scene`, `trajectory`, `render`, and 
 
 ## Cohorts and stopping rule
 
-- `manifests/pilot_11.json` is the fixed one-per-dataset pilot.
+- `manifests/pilot_10.json` is the active fixed one-per-dataset pilot. FMB is excluded.
+- `manifests/pilot_11.json` is retained only to reproduce historical experiments that included FMB.
+- `manifests/validation_100.json` is sampled from `/datasets/sharerobot_planning_manipulation_selected`, the active 1,000-scene manipulation dataset.
 - `select_validation.py` deterministically selects 100 scenes with all 11 datasets, all observed image resolutions, and forced task-family coverage. It uses only manifest goals and PNG headers.
 - `review-index` writes JSON and HTML review indexes with the agreed failure taxonomy and visual checklist.
 
@@ -60,6 +62,6 @@ Each scene contains `input.json`, `frames/`, `task_spec.json`, `masks/`, `tracks
 
 ## Whole-robot tracking comparison
 
-`run_robot_tracking_experiment.sh` is a segmentation-only comparison between the official RobotSeg automatic video mode (`category="robot"`) and SAM3 native video propagation from the single text prompt `robot`. It processes every frame in `manifests/pilot_11.json` and deliberately skips Qwen, all non-robot entities, relations, actions, DA3, and trajectories.
+`run_robot_tracking_experiment.sh` is a segmentation-only comparison between the official RobotSeg automatic video mode (`category="robot"`) and SAM3 native video propagation from the single text prompt `robot`. It processes every frame in `manifests/pilot_10.json` and deliberately skips Qwen, all non-robot entities, relations, actions, DA3, and trajectories.
 
 The run writes per-method masks and diagnostics, plus a three-panel `visualization.mp4` and `contact_sheet.png` for every scene. The diagnostics describe temporal mask behavior without ground-truth robot masks; they are not segmentation-accuracy metrics.
