@@ -1,0 +1,77 @@
+Experiment: controlled boundary-only graph evidence with frozen upstream artifacts
+Source commit: 2b6cc3a23908daa1ed706688366f67f4926da660
+Frozen baseline: 48d934e85ddd8b93a570f647f7f5c103a0dbdd01
+Outcome count: 4 fully successful, 4 partially successful, and 2 unsuccessful.
+
+Method
+------
+This is a true graph-only ablation. The ten baseline scenes were copied with
+filesystem reflinks, and all task specifications, tracks, masks, input frames,
+DA3 outputs, and trajectories were preserved. A hash audit confirmed that all
+1,040 task-specification, tracking, and mask files are byte-identical to the
+baseline. Only Qwen graph inference, rendering, validation, and review indexing
+were rerun. Qwen received opaque role-colored boundaries and role markers, with
+no mask-area color fill.
+
+Automated result
+----------------
+Graph inference, rendering, and validation completed for all ten scenes with no
+failures. The controlled run reproduces the four important endpoint changes
+seen in the earlier boundary experiment: Clamp, UCSD, VIOLA, and Bridge. This
+confirms that these endpoint changes are caused by graph evidence rendering,
+not by a changed entity specification or mask track.
+
+Visual assessment by scene
+--------------------------
+9 ASU TableTop / episode 83 — partially successful
+The frozen baseline correctly follows the orange/red task box rather than the
+unrelated green bottle selected in the confounded light-fill run. The graph is
+plausible but conservative at the end, where the object remains supported while
+the gripper is at it.
+
+11 UTokyo xArm / episode 72 — fully successful
+The white plate transfer and final stack on the red plate remain coherent. The
+initial and final relations match the baseline.
+
+15 DLR SARA Grid Clamp / episode 17 — partially successful
+Boundary evidence changes the final state from holding to object-on-support.
+This is more conservative for the short clip, but repeated-instance identity
+and incomplete task evidence prevent a definitive success judgment.
+
+17 DLR SARA Pour / episode 0 — fully successful
+The small container, mug, support, robot, and pour interpretation remain
+coherent. Initial and final relations match the baseline.
+
+18 DLR EDAN / episode 5 — unsuccessful
+The requested tube is not visually established in the source clip. Frozen
+evidence confirms this is not repairable by a graph overlay change.
+
+19 UCSD / episode 1026 — partially successful
+This is the decisive regression: the small red object is visibly held at the
+end, but boundary-only evidence predicts that it remains on the support. The
+filled baseline predicts the correct final holding relation.
+
+28 VIOLA / episode 112 — fully successful
+Boundary evidence preserves the correct bowl-on-target-plate relation and
+removes the false target-plate-on-lazy-Susan relation at both endpoints.
+
+49 Bridge / episode 9130 — fully successful
+The oven door changes from closed to open and remains part of the oven.
+Boundary evidence removes the unnecessary final robot-touching-door relation.
+
+60 PLEX RoboSuite / episode 75 — partially successful
+The final inside-container relation is plausible, but the frozen object mask is
+missing through the long occlusion and only 11/30 trajectory points are valid.
+
+62 RoboSet / episode 5990 — unsuccessful
+The relevant robot and object are visible only near the end, leaving only 7/30
+trajectory points valid. The action cannot be judged from this clip.
+
+Decision
+--------
+Do not adopt boundary-only evidence globally. It produces two clear graph
+improvements (VIOLA and Bridge) and a reasonable conservative change in Clamp,
+but it loses the clearly correct small-object holding state in UCSD. Restore the
+filled-mask baseline as the current default. A future graph-evidence change
+would need adaptive or dual-view evidence and must use the same frozen-upstream
+protocol; another global opacity adjustment is not justified by these results.
