@@ -865,7 +865,7 @@ def framewise_graph_verification_prompt(
 ) -> str:
     entity_ids, _, context = graph_context(goal, task, frame_indices)
     scope_instruction = (
-        "All video frames are supplied in order. Use the complete temporal sequence to verify both states and actions."
+        "All video frames are supplied in order. Use the complete temporal sequence to verify both states and actions. Persistent physical states should remain stable until visible evidence changes them; do not introduce one-frame relation flicker."
         if scope == "whole_video"
         else "Only the current frame image is supplied. Judge visible state directly and keep an action only when that action is visually supported in this frame; do not pretend to see absent temporal evidence."
     )
