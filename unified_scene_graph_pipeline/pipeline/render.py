@@ -27,6 +27,23 @@ ROLE_MARKERS = {
     "whole_parent": "P",
 }
 
+STATE_COLOR = (78, 205, 196)
+ACTION_COLOR = (255, 183, 77)
+NEW_COLOR = (117, 226, 126)
+
+
+def _load_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
+    """Use a readable bundled system font when available, with a safe fallback."""
+    name = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
+    candidates = [
+        Path("/usr/share/fonts/truetype/dejavu") / name,
+        Path("/usr/share/fonts/dejavu") / name,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return ImageFont.truetype(str(candidate), size=size)
+    return ImageFont.load_default()
+
 
 def _mask_boundary(mask: np.ndarray, width: int) -> np.ndarray:
     """Return a deterministic boundary band without adding another dependency."""
@@ -60,6 +77,81 @@ def _fit_text(text: str, draw: ImageDraw.ImageDraw, font: ImageFont.ImageFont, m
     return text + suffix
 
 
+def _entity_label(entity_id: str | None, task: dict[str, Any]) -> str:
+    if not entity_id:
+        return ""
+    entity = next(
+        (item for item in task.get("entities", []) if item.get("entity_id") == entity_id),
+        None,
+    )
+    if not entity:
+        return str(entity_id)
+    marker = ROLE_MARKERS.get(entity.get("role", ""), "?")
+    name = entity.get("canonical_name") or entity_id
+    return f"{marker}  {name}"
+
+
+def _edge_key(edge: dict[str, Any]) -> tuple[str, str, str]:
+    return (
+        str(edge.get("subject") or ""),
+        str(edge.get("relation") or ""),
+        str(edge.get("object") or ""),
+    )
+
+
+def _action_key(action: dict[str, Any]) -> tuple[str, str, str]:
+    return (
+        str(action.get("actor") or ""),
+        str(action.get("action") or ""),
+        str(action.get("object") or ""),
+    )
+
+
+def _relation_rows(
+    row: dict[str, Any],
+    previous_row: dict[str, Any] | None,
+    task: dict[str, Any],
+) -> list[dict[str, Any]]:
+    previous_edges = {
+        _edge_key(item) for item in (previous_row or {}).get("state_edges", [])
+    }
+    previous_actions = {
+        _action_key(item) for item in (previous_row or {}).get("actions", [])
+    }
+    rows: list[dict[str, Any]] = []
+    state_edges = row.get("state_edges", [])
+    actions = row.get("actions", [])
+    if state_edges:
+        for edge in state_edges:
+            subject = _entity_label(edge.get("subject"), task)
+            relation = str(edge.get("relation") or "relation").upper()
+            object_label = _entity_label(edge.get("object"), task)
+            text = f"{subject}   — {relation} →   {object_label}" if object_label else f"{subject}   — {relation}"
+            rows.append({
+                "kind": "STATE",
+                "text": text,
+                "color": STATE_COLOR,
+                "new": _edge_key(edge) not in previous_edges,
+            })
+    else:
+        rows.append({"kind": "STATE", "text": "No state relation predicted", "color": STATE_COLOR, "new": False})
+    if actions:
+        for action in actions:
+            actor = _entity_label(action.get("actor"), task)
+            action_name = str(action.get("action") or "action").upper()
+            object_label = _entity_label(action.get("object"), task)
+            text = f"{actor}   — {action_name} →   {object_label}" if object_label else f"{actor}   — {action_name}"
+            rows.append({
+                "kind": "ACTION",
+                "text": text,
+                "color": ACTION_COLOR,
+                "new": _action_key(action) not in previous_actions,
+            })
+    else:
+        rows.append({"kind": "ACTION", "text": "No action predicted", "color": ACTION_COLOR, "new": False})
+    return rows
+
+
 def _draw_frame(
     output: Path,
     index: int,
@@ -67,6 +159,7 @@ def _draw_frame(
     graph: dict[str, Any],
     render_config: dict[str, Any] | None = None,
     tracks_by_entity: dict[str, dict[str, Any]] | None = None,
+    relation_row_count: int | None = None,
 ) -> Image.Image:
     render_config = render_config or {}
     tracks_by_entity = tracks_by_entity or {}
@@ -129,8 +222,10 @@ def _draw_frame(
             for x_min, y_min, x_max, y_max, color in grounding_boxes
         ]
 
-    font = ImageFont.load_default()
-    line_height = 15
+    header_font = _load_font(14)
+    header_bold_font = _load_font(14, bold=True)
+    marker_font = _load_font(15, bold=True)
+    line_height = 20
     header_lines = [f"Goal: {task.get('planning_goal', '')}"]
     for entity in task["entities"]:
         marker = ROLE_MARKERS.get(entity["role"], "?")
@@ -157,10 +252,14 @@ def _draw_frame(
     header_height = 10 + line_height * len(header_lines)
 
     row = graph["frames"][index]
-    edge_lines = [f"{edge['subject']} {edge['relation']} {edge['object'] or ''}".rstrip() for edge in row["state_edges"]]
-    action_lines = [f"{action['actor']} {action['action']} {action['object'] or ''}".rstrip() for action in row["actions"]]
-    graph_lines = [f"frame {index}", *(f"S: {line}" for line in edge_lines), *(f"A: {line}" for line in action_lines)]
-    graph_height = 8 + line_height * max(1, len(graph_lines))
+    previous_row = graph["frames"][index - 1] if index > 0 else None
+    relation_rows = _relation_rows(row, previous_row, task)
+    relation_row_count = max(relation_row_count or len(relation_rows), len(relation_rows))
+    relation_font_size = max(18, min(24, rendered.width // 30))
+    relation_font = _load_font(relation_font_size, bold=True)
+    badge_font = _load_font(max(13, relation_font_size - 6), bold=True)
+    relation_line_height = relation_font_size + 16
+    graph_height = 48 + relation_line_height * relation_row_count
 
     canvas_width = rendered.width + (rendered.width % 2)
     canvas_height = header_height + rendered.height + graph_height
@@ -182,17 +281,58 @@ def _draw_frame(
         else:
             entity = task["entities"][line_index - 1]
             color = ROLE_COLORS.get(entity["role"], (210, 210, 210))
-        draw.text((6, y), _fit_text(line, draw, font, canvas_width - 12), fill=color, font=font)
+        selected_font = header_bold_font if line_index == 0 else header_font
+        draw.text((8, y), _fit_text(line, draw, selected_font, canvas_width - 16), fill=color, font=selected_font)
     for x, y, label, color in labels:
         x = min(x, canvas_width - 16)
         y = min(y + header_height, header_height + rendered.height - line_height)
-        box = draw.textbbox((x, y), label, font=font)
+        box = draw.textbbox((x, y), label, font=marker_font)
         draw.rectangle((box[0] - 2, box[1] - 1, box[2] + 2, box[3] + 1), fill=(0, 0, 0), outline=color, width=1)
-        draw.text((x, y), label, fill=color, font=font)
+        draw.text((x, y), label, fill=color, font=marker_font)
     graph_y = header_height + rendered.height
-    draw.line((0, graph_y, canvas_width, graph_y), fill=(75, 80, 90), width=1)
-    for line_index, line in enumerate(graph_lines):
-        draw.text((6, graph_y + 4 + line_index * line_height), _fit_text(line, draw, font, canvas_width - 12), fill="white", font=font)
+    draw.rectangle((0, graph_y, canvas_width, canvas_height), fill=(9, 13, 19))
+    draw.line((0, graph_y, canvas_width, graph_y), fill=(105, 115, 130), width=2)
+    title_font = _load_font(17, bold=True)
+    draw.text(
+        (10, graph_y + 8),
+        f"PREDICTED RELATIONS  •  FRAME {index + 1}/{len(graph['frames'])}",
+        fill=(245, 247, 250),
+        font=title_font,
+    )
+    for row_index, relation_row in enumerate(relation_rows):
+        y_min = graph_y + 38 + row_index * relation_line_height
+        y_max = y_min + relation_line_height - 6
+        color = relation_row["color"]
+        outline = NEW_COLOR if relation_row["new"] else tuple(max(25, int(channel * 0.62)) for channel in color)
+        draw.rounded_rectangle(
+            (8, y_min, canvas_width - 8, y_max),
+            radius=7,
+            fill=(20, 27, 36),
+            outline=outline,
+            width=3 if relation_row["new"] else 1,
+        )
+        badge_width = 72
+        draw.rounded_rectangle(
+            (15, y_min + 6, 15 + badge_width, y_max - 6),
+            radius=5,
+            fill=tuple(max(0, int(channel * 0.35)) for channel in color),
+        )
+        draw.text((24, y_min + 9), relation_row["kind"], fill=color, font=badge_font)
+        text_x = 99
+        new_label_width = 0
+        if relation_row["new"]:
+            new_text = "NEW"
+            new_box = draw.textbbox((0, 0), new_text, font=badge_font)
+            new_label_width = new_box[2] - new_box[0] + 18
+            draw.rounded_rectangle(
+                (canvas_width - new_label_width - 15, y_min + 6, canvas_width - 15, y_max - 6),
+                radius=5,
+                fill=(31, 87, 47),
+            )
+            draw.text((canvas_width - new_label_width - 6, y_min + 9), new_text, fill=NEW_COLOR, font=badge_font)
+        available_width = canvas_width - text_x - 18 - new_label_width
+        relation_text = _fit_text(relation_row["text"], draw, relation_font, available_width)
+        draw.text((text_x, y_min + 6), relation_text, fill=(242, 245, 248), font=relation_font)
     return canvas
 
 
@@ -210,12 +350,17 @@ def render(output: Path, config: dict[str, Any], overwrite: bool = False) -> dic
     tracks_by_entity = {
         track["entity_id"]: track for track in tracks.get("tracks", [])
     }
+    relation_row_count = max(
+        len(_relation_rows(row, graph["frames"][index - 1] if index > 0 else None, task))
+        for index, row in enumerate(graph["frames"])
+    )
     with tempfile.TemporaryDirectory(prefix="unified_sgg_render_") as temporary_name:
         temporary = Path(temporary_name)
         rendered_frames = []
         for index in range(int(context["frame_count"])):
             frame = _draw_frame(
                 output, index, task, graph, config.get("render"), tracks_by_entity,
+                relation_row_count,
             )
             path = temporary / f"frame_{index:06d}.jpg"
             frame.save(path, quality=92)
