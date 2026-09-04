@@ -1,0 +1,117 @@
+EXPERIMENT: Qwen relation/action verification
+Pipeline commit: 2b788cc5fe04bba9d1652d59ad544c0d3923a29a
+Frozen baseline commit: 48d934e85ddd8b93a570f647f7f5c103a0dbdd01
+
+Question
+--------
+Can an additional Qwen pass improve the state relations and action timeline produced by
+the existing verified-event pipeline? Two global variants were tested on the same fixed
+10-scene cross-dataset pilot:
+
+1. whole_video: one verifier receives the full video and rewrites all 30 graph frames.
+2. per_frame: one independent verifier call rewrites each graph frame.
+
+The task specifications, tracks, and masks were frozen and byte-identical across all
+three variants. Their combined SHA-256 is
+5ccb053fa35825c20c3d1105c7b878db0e024df25baab5134802d0e563f38174.
+Therefore, this experiment isolates graph verification rather than tracking quality.
+
+Automated validation
+--------------------
+baseline:    10 successful runs, 0 failed runs
+whole_video: 10 successful runs, 0 failed runs
+per_frame:   10 successful runs, 0 failed runs
+
+Manual relation/action assessment
+---------------------------------
+The categories below assess graph quality visible in the 30-frame videos. Scenes with a
+planning goal that visibly disagrees with the episode are reported separately and are
+not counted as task-aligned successes or failures.
+
+baseline:    4 fully successful, 3 partially successful, 1 unsuccessful, 2 excluded
+whole_video: 2 fully successful, 3 partially successful, 3 unsuccessful, 2 excluded
+per_frame:   0 fully successful, 3 partially successful, 5 unsuccessful, 2 excluded
+
+These counts are a manual pilot assessment, not a statistical metric. "Partially
+successful" means that the important endpoints or event family are present but at least
+one material relation, action, or timing error remains.
+
+Per-scene conclusions
+---------------------
+
+9_asu_table_top_converted_externally_to_rlds / episode_83
+EXCLUDED from task-aligned scoring: the goal says red box, while the visibly manipulated
+box is orange and a separate red object remains in the scene. The baseline nevertheless
+captures the visible pick/move/place sequence. Both verifier variants remove that visible
+sequence, so they are qualitatively worse even though the goal itself is unreliable.
+
+11_utokyo_xarm_pick_and_place_converted_externally_to_rlds / episode_72
+Baseline: fully successful. Whole-video: fully successful and slightly cleaner temporal
+segmentation while preserving correct initial/final stacking relations. Per-frame:
+unsuccessful; it loses most actions and the final relation.
+
+15_dlr_sara_grid_clamp_converted_externally_to_rlds / episode_17
+Baseline: unsuccessful because it invents holding after the first few frames. Both
+verifiers correctly remove that unsupported holding/action claim, but the observed clip
+is static/incomplete for the stated task, so both are marked partial rather than full.
+
+17_dlr_sara_pour_converted_externally_to_rlds / episode_0
+Baseline: fully successful. Whole-video: fully successful overall; it preserves the
+pick-and-pour sequence, although the final touching relation is debatable. Per-frame:
+partial; it finds the pour but fragments the preceding motion and briefly reverses a
+holding relation.
+
+18_dlr_edan_shared_control_converted_externally_to_rlds / episode_5
+Baseline: partial but temporally coherent. Whole-video: unsuccessful; it predicts the
+object inside the shelf for the entire clip and extends grab through the end. Per-frame:
+unsuccessful; states and actions flicker heavily across adjacent frames.
+
+19_ucsd_pick_and_place_dataset_converted_externally_to_rlds / episode_1026
+Baseline: fully successful. Whole-video: unsuccessful; it predicts release and a final
+on-table state while the object is visibly still held/suspended. Per-frame: unsuccessful;
+it removes almost the entire manipulation sequence.
+
+28_viola / episode_112
+Baseline: partial because target-on-initial-support is falsely retained. Whole-video:
+partial; it fixes that false relation and preserves the initial/final object placement,
+but removes every action. Per-frame: unsuccessful; all relations and actions are empty.
+
+49_bridge / episode_9130
+Baseline: partial because touching and open are extended too long. Whole-video: partial;
+it fixes the false final touching relation and preserves closed-to-open, but open timing
+is still overextended. Per-frame: partial; endpoints are correct, but state/action output
+flickers between adjacent frames.
+
+60_plex_robosuite / episode_75
+Baseline: fully successful at the graph level, with the caveat that the upstream target
+track is visually questionable. Whole-video: unsuccessful; it replaces the placement
+with an unchanged on-table state and no actions. Per-frame: unsuccessful; it returns
+mostly empty frames and misses the final inside relation.
+
+62_robo_set / episode_5990
+EXCLUDED from task-aligned scoring: the goal says blue towel, but the visible manipulated
+towel is beige. The baseline captures the late visible reach/grab/lift. Both verifier
+variants erase that visible event, so neither is an improvement despite the invalid goal.
+
+Decision
+--------
+Do not adopt either verifier. Keep the current verified_event_timeline baseline as the
+best graph pipeline. The whole-video verifier has useful local corrections (clamp false
+holding, VIOLA support relation, Bridge final touching), but its tendency to prefer empty
+outputs deletes too many clearly visible actions and states. The per-frame verifier lacks
+temporal evidence and is decisively worse.
+
+No further prompt patch was run because another global rewrite prompt would likely trade
+one deletion pattern for another. A future verifier should inspect individual draft
+claims and accept/reject or adjust their frame ranges, rather than regenerate the full
+graph. That is a separate design experiment and was not started.
+
+Scope and runtime notes
+-----------------------
+- Qwen ran in Docker on vkusvill GPU 2 (whole-video) and GPU 3 (per-frame).
+- End-to-end pilot time, including model startup/render/validation: 366 seconds for
+  whole-video and 288 seconds for per-frame.
+- Qwen containers were stopped after the runs.
+- 3D distance was intentionally not implemented or used in this experiment.
+- Visualizations use a 2x3 contact sheet and raw RGB with dynamically positioned role
+  letters; masks are not painted over the human-review video.
