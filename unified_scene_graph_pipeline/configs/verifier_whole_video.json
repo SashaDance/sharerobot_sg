@@ -5,7 +5,7 @@
     "qwen": {
       "graph_mode": "whole_video_frame_verifier",
       "graph_prompt_version": "event_draft_whole_video_frame_verifier_v1",
-      "graph_overlay_mode": "markers_only",
+      "graph_overlay_mode": "boundary_with_markers",
       "max_tokens_graph_verifier": 7000
     },
     "render": {

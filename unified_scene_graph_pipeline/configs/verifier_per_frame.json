@@ -5,7 +5,7 @@
     "qwen": {
       "graph_mode": "per_frame_verifier",
       "graph_prompt_version": "event_draft_per_frame_verifier_v1",
-      "graph_overlay_mode": "markers_only",
+      "graph_overlay_mode": "boundary_with_markers",
       "max_tokens_frame_verifier": 900
     },
     "render": {
