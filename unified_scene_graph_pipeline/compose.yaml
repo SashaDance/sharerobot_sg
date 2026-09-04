@@ -41,7 +41,9 @@ services:
     command: ["python", "/proxy/auth_proxy.py"]
     environment:
       INFERENCE_API_KEY: ${INFERENCE_API_KEY:?set INFERENCE_API_KEY in the mode-600 runtime env file}
-      UPSTREAM_HOST: qwen
+      # A trailing dot avoids Kubernetes-style host search domains on servers
+      # whose host resolv.conf is inherited by Docker's embedded DNS.
+      UPSTREAM_HOST: qwen.
       UPSTREAM_PORT: "8000"
     volumes:
       - ./auth_proxy.py:/proxy/auth_proxy.py:ro

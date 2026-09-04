@@ -1,7 +1,7 @@
 {
   "schema_version": "unified_sgg_config_v1",
   "qwen": {
-    "base_url": "http://qwen-proxy:8080/v1",
+    "base_url": "http://qwen-proxy.:8080/v1",
     "model": "Qwen/Qwen3.8-27B",
     "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
     "frames_per_request": 30,
