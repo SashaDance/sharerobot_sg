@@ -72,7 +72,7 @@ case "${1:-}" in
     source "$RUNTIME_ENV"
     set +a
     for attempt in $(seq 1 120); do
-      if curl --silent --fail --max-time 3 -H "Authorization: Bearer ${INFERENCE_API_KEY}" http://127.0.0.1:8008/v1/models >/dev/null; then
+      if curl --silent --fail --max-time 3 -H "Authorization: Bearer ${INFERENCE_API_KEY}" "http://127.0.0.1:${QWEN_HOST_PORT:-8008}/v1/models" >/dev/null; then
         echo "Qwen is ready"
         exit 0
       fi

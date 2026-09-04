@@ -1,4 +1,4 @@
-name: unified-sgg
+name: ${COMPOSE_PROJECT_NAME:-unified-sgg}
 
 services:
   qwen:
@@ -17,7 +17,7 @@ services:
       - --max-num-seqs
       - "1"
       - --gpu-memory-utilization
-      - "0.92"
+      - "${QWEN_GPU_MEMORY_UTILIZATION:-0.92}"
       - --limit-mm-per-prompt
       - '{"image":30}'
       - --trust-remote-code
@@ -33,7 +33,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["1"]
+              device_ids: ["${QWEN_GPU_ID:-1}"]
               capabilities: [gpu]
 
   qwen-proxy:
@@ -46,7 +46,7 @@ services:
     volumes:
       - ./auth_proxy.py:/proxy/auth_proxy.py:ro
     ports:
-      - 127.0.0.1:8008:8080
+      - 127.0.0.1:${QWEN_HOST_PORT:-8008}:8080
     depends_on:
       - qwen
     restart: unless-stopped
@@ -71,7 +71,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["1"]
+              device_ids: ["${CORE_GPU_ID:-1}"]
               capabilities: [gpu]
 
   robotseg:
@@ -92,7 +92,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["1"]
+              device_ids: ["${CORE_GPU_ID:-1}"]
               capabilities: [gpu]
 
   reviosa:
@@ -113,7 +113,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["1"]
+              device_ids: ["${CORE_GPU_ID:-1}"]
               capabilities: [gpu]
 
   da3:
@@ -132,5 +132,5 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["1"]
+              device_ids: ["${DA3_GPU_ID:-1}"]
               capabilities: [gpu]

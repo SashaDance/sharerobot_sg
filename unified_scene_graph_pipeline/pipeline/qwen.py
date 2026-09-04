@@ -12,7 +12,8 @@ import requests
 
 from common import (
     complete_stage, config_hash, mask_geometry, read_json, require_api_key,
-    stage_current, stage_fingerprint, update_run_report, write_json_atomic,
+    mask_label_placement, stage_current, stage_fingerprint, update_run_report,
+    write_json_atomic,
 )
 
 
@@ -678,6 +679,8 @@ def _apply_graph_mask_overlay(
 ) -> None:
     import numpy as np
 
+    if mode == "markers_only":
+        return
     if mode == "boundary_with_markers":
         pixels[_mask_boundary(mask)] = color
     elif mode == "light_fill_boundary_with_markers":
@@ -696,7 +699,7 @@ def overlay_frame(
     mode: str = "filled_with_markers",
 ) -> bytes:
     from io import BytesIO
-    from PIL import Image, ImageDraw
+    from PIL import Image, ImageDraw, ImageFont
     import numpy as np
 
     frame = Image.open(output / "frames" / f"frame_{frame_index:06d}.png").convert("RGB")
@@ -708,14 +711,22 @@ def overlay_frame(
         if mask.any():
             color = np.asarray(MASK_COLORS[entity["role"]][0])
             _apply_graph_mask_overlay(pixels, mask, color, mode)
-            ys, xs = np.nonzero(mask)
-            markers.append((int(xs.min()), int(ys.min()), MASK_MARKERS[entity["role"]], tuple(color.tolist())))
+            x, y, radius = mask_label_placement(mask)
+            markers.append((x, y, radius, MASK_MARKERS[entity["role"]], tuple(color.tolist())))
     rendered = Image.fromarray(pixels)
     draw = ImageDraw.Draw(rendered)
-    for x, y, marker, color in markers:
-        box = draw.textbbox((x, y), marker)
-        draw.rectangle(box, fill=(0, 0, 0))
-        draw.text((x, y), marker, fill=color)
+    for x, y, radius, marker, color in markers:
+        font_size = max(11, min(30, round(radius * 1.6)))
+        try:
+            font = ImageFont.truetype("DejaVuSans-Bold.ttf", size=font_size)
+        except OSError:
+            font = ImageFont.load_default()
+        box = draw.textbbox((0, 0), marker, font=font)
+        width, height = box[2] - box[0], box[3] - box[1]
+        origin = (max(0, x - width // 2), max(0, y - height // 2))
+        box = draw.textbbox(origin, marker, font=font)
+        draw.rectangle((box[0] - 2, box[1] - 2, box[2] + 2, box[3] + 2), fill=(0, 0, 0))
+        draw.text(origin, marker, fill=color, font=font)
     stream = BytesIO()
     rendered.save(stream, format="JPEG", quality=88)
     return stream.getvalue()
@@ -795,6 +806,82 @@ def validate_action_document(value: dict[str, Any], requested: list[int], task: 
             expanded_actions.append(action)
         rows.append({"frame_index": frame_index, "actions": expanded_actions})
     return rows
+
+
+def validate_framewise_graph_document(
+    value: dict[str, Any],
+    requested: list[int],
+    task: dict[str, Any],
+    config: dict[str, Any],
+) -> list[dict[str, Any]]:
+    if set(value) != {"frames"} or not isinstance(value["frames"], list):
+        raise ValueError("Expected only frames list")
+    packed_rows = value["frames"]
+    if any(not isinstance(row, list) or len(row) != 3 for row in packed_rows):
+        raise ValueError("Each verified frame must be [frame_index,state_edges,actions]")
+    states = {"frames": [[row[0], row[1]] for row in packed_rows]}
+    actions = {"frames": [[row[0], row[2]] for row in packed_rows]}
+    state_rows = validate_state_document(states, requested, task, config)
+    action_rows = validate_action_document(actions, requested, task, config)
+    actions_by_index = {row["frame_index"]: row["actions"] for row in action_rows}
+    return [
+        {
+            "frame_index": row["frame_index"],
+            "state_edges": row["state_edges"],
+            "actions": actions_by_index[row["frame_index"]],
+        }
+        for row in state_rows
+    ]
+
+
+def _compact_framewise_graph(
+    state_rows: list[dict[str, Any]],
+    action_rows: list[dict[str, Any]],
+) -> list[list[Any]]:
+    actions_by_index = {row["frame_index"]: row["actions"] for row in action_rows}
+    packed = []
+    for row in state_rows:
+        packed.append([
+            row["frame_index"],
+            [
+                [edge["subject"], edge["relation"], edge.get("object")]
+                for edge in row["state_edges"]
+            ],
+            [
+                [action["actor"], action["action"], action.get("object")]
+                for action in actions_by_index[row["frame_index"]]
+            ],
+        ])
+    return packed
+
+
+def framewise_graph_verification_prompt(
+    goal: str,
+    task: dict[str, Any],
+    frame_indices: list[int],
+    config: dict[str, Any],
+    draft_frames: list[list[Any]],
+    scope: str,
+) -> str:
+    entity_ids, _, context = graph_context(goal, task, frame_indices)
+    scope_instruction = (
+        "All video frames are supplied in order. Use the complete temporal sequence to verify both states and actions."
+        if scope == "whole_video"
+        else "Only the current frame image is supplied. Judge visible state directly and keep an action only when that action is visually supported in this frame; do not pretend to see absent temporal evidence."
+    )
+    return f"""Independently verify and correct the draft scene graph at frame level.
+{context}
+Draft frame rows: {json.dumps(draft_frames, ensure_ascii=False)}
+{scope_instruction}
+
+Return compact JSON only: {{"frames":[[frame_index,[[subject,relation,object_or_null],...],[[actor,action,object_or_null],...]],...]}}.
+Return exactly one row for every requested frame and no others. Valid entity IDs: {entity_ids}.
+Allowed state relations: {config['ontology']['states']}.
+Allowed actions: {config['ontology']['actions']}.
+
+First make an independent visual judgement, then use the draft only as a candidate to keep, remove, or replace. The video is authoritative if the planning goal is inconsistent. Use on only for direct support by an upper surface; inside only for containment by a target; holding only when the object is secured by and moves with the robot; touching only for direct contact, not proximity. An action must describe what is visibly happening in that frame, not the intended task. Empty state or action lists are valid and preferred over guesses.
+
+Do not output confidence, reasoning, coordinates, descriptions, corrections, planning steps, or extra fields."""
 
 
 def event_graph_prompt(goal: str, task: dict[str, Any], frame_indices: list[int], config: dict[str, Any]) -> str:
@@ -1023,6 +1110,83 @@ def infer_graph(output: Path, config: dict[str, Any], overwrite: bool = False) -
                 "draft_attempts": draft_attempts,
                 "verifier_attempts": verifier_attempts,
             })
+    elif graph_mode in {"whole_video_frame_verifier", "per_frame_verifier"}:
+        prior_final_state = None
+        verifier_scope = "whole_video" if graph_mode == "whole_video_frame_verifier" else "per_frame"
+        for current, previous in contextual_chunks(indices, int(config["qwen"]["frames_per_request"])):
+            visual = ([previous] if previous is not None else []) + current
+            prompt = event_graph_prompt(context["planning_goal"], task, current, config)
+            if previous is not None:
+                prompt += f"\nFrame {previous} is visual context only and MUST NOT appear in event intervals or transitions."
+                prompt += "\nVerified persistent state immediately before this chunk: " + json.dumps(prior_final_state, ensure_ascii=False)
+            draft, draft_attempts = client.request(
+                graph_content(output, prompt, task, visual, config),
+                int(config["qwen"]["max_tokens_graph"]),
+                lambda value, requested=current, expected=prior_final_state: validate_event_graph_document(
+                    value, requested, task, config, expected,
+                ),
+            )
+            draft_states, draft_actions = expand_event_graph(draft, current)
+            draft_frames = _compact_framewise_graph(draft_states, draft_actions)
+            verifier_attempts: list[dict[str, Any]] = []
+            if verifier_scope == "whole_video":
+                verify_prompt = framewise_graph_verification_prompt(
+                    context["planning_goal"], task, current, config, draft_frames, verifier_scope,
+                )
+                verified_rows, attempts = client.request(
+                    graph_content(output, verify_prompt, task, visual, config),
+                    int(config["qwen"].get("max_tokens_graph_verifier", 7000)),
+                    lambda value, requested=current: validate_framewise_graph_document(
+                        value, requested, task, config,
+                    ),
+                )
+                verifier_attempts.append({"frames": current, "attempts": attempts})
+            else:
+                verified_rows = []
+                for packed_frame in draft_frames:
+                    frame_index = int(packed_frame[0])
+                    verify_prompt = framewise_graph_verification_prompt(
+                        context["planning_goal"], task, [frame_index], config,
+                        [packed_frame], verifier_scope,
+                    )
+                    verified_frame, attempts = client.request(
+                        graph_content(output, verify_prompt, task, [frame_index], config),
+                        int(config["qwen"].get("max_tokens_frame_verifier", 900)),
+                        lambda value, requested=[frame_index]: validate_framewise_graph_document(
+                            value, requested, task, config,
+                        ),
+                    )
+                    verified_rows.extend(verified_frame)
+                    verifier_attempts.append({"frames": [frame_index], "attempts": attempts})
+            state_rows.extend({
+                "frame_index": row["frame_index"], "state_edges": row["state_edges"],
+            } for row in verified_rows)
+            action_rows.extend({
+                "frame_index": row["frame_index"], "actions": row["actions"],
+            } for row in verified_rows)
+            prior_final_state = [
+                [edge["subject"], edge["relation"], edge.get("object")]
+                for edge in verified_rows[-1]["state_edges"]
+            ]
+            event_audit.append({
+                "output_frames": current,
+                "visual_frames": visual,
+                "draft": draft,
+                "draft_frames": draft_frames,
+                "verifier_scope": verifier_scope,
+                "verified_frames": _compact_framewise_graph(
+                    [
+                        {"frame_index": row["frame_index"], "state_edges": row["state_edges"]}
+                        for row in verified_rows
+                    ],
+                    [
+                        {"frame_index": row["frame_index"], "actions": row["actions"]}
+                        for row in verified_rows
+                    ],
+                ),
+                "draft_attempts": draft_attempts,
+                "verifier_attempts": verifier_attempts,
+            })
     elif graph_mode == "independent_split":
         for current, previous in contextual_chunks(indices, int(config["qwen"]["frames_per_request"])):
             # A previous RGB+mask image provides visual boundary context only; it is explicitly excluded from output.
@@ -1059,7 +1223,7 @@ def infer_graph(output: Path, config: dict[str, Any], overwrite: bool = False) -
         "frame_count": len(frames),
         "frames": frames,
         "ontology": config["ontology"],
-        "provenance": {"model": config["qwen"]["model"], "model_revision": config["qwen"]["revision"], "prompt_version": config["qwen"]["graph_prompt_version"], "config_hash": config_hash(config), "graph_mode": graph_mode, "per_frame_inference": graph_mode == "independent_split", "split_state_action_inference": graph_mode == "independent_split"},
+        "provenance": {"model": config["qwen"]["model"], "model_revision": config["qwen"]["revision"], "prompt_version": config["qwen"]["graph_prompt_version"], "config_hash": config_hash(config), "graph_mode": graph_mode, "per_frame_inference": graph_mode in {"independent_split", "per_frame_verifier"}, "split_state_action_inference": graph_mode == "independent_split"},
     }
     write_json_atomic(target, result)
     write_json_atomic(output / "qwen_graph_audit.json", {
@@ -1072,6 +1236,11 @@ def infer_graph(output: Path, config: dict[str, Any], overwrite: bool = False) -
             context["planning_goal"], task, ["<output_frame_indices>"], config,
             {"initial_state": [], "events": [], "transitions": [], "final_state": []},
         ),
+        "framewise_verifier_prompt_template": framewise_graph_verification_prompt(
+            context["planning_goal"], task, ["<output_frame_indices>"], config,
+            [["<frame_index>", ["<state_edges>"], ["<actions>"]]],
+            "whole_video" if graph_mode == "whole_video_frame_verifier" else "per_frame",
+        ) if graph_mode in {"whole_video_frame_verifier", "per_frame_verifier"} else None,
         "event_chunks": event_audit,
     })
     complete_stage(output, "graph", fingerprint, {"frame_count": len(frames)})

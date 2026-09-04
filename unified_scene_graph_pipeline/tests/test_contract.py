@@ -11,7 +11,8 @@ from PIL import Image
 PIPELINE = Path(__file__).resolve().parents[1] / "pipeline"
 sys.path.insert(0, str(PIPELINE))
 
-from common import ensure_no_confidence, image_paths  # noqa: E402
+from common import ensure_no_confidence, image_paths, mask_label_placement  # noqa: E402
+from cli import _config  # noqa: E402
 from prepare import prepare  # noqa: E402
 from qwen import (  # noqa: E402
     QwenClient,
@@ -25,6 +26,7 @@ from qwen import (  # noqa: E402
     validate_action_document,
     validate_entity_document,
     validate_event_graph_document,
+    validate_framewise_graph_document,
     validate_state_document,
     validate_tracking_document,
 )
@@ -200,6 +202,23 @@ def test_graph_schema_requires_requested_frames_and_valid_references() -> None:
         raise AssertionError("invalid reference accepted")
     except ValueError:
         pass
+
+
+def test_framewise_verifier_schema_combines_states_and_actions() -> None:
+    task = {"entities": [{"entity_id": "robot"}, {"entity_id": "manipulated_object"}]}
+    config = {"ontology": {"states": ["holding"], "actions": ["move"]}}
+    value = {
+        "frames": [[
+            4,
+            [["robot", "holding", "manipulated_object"]],
+            [["robot", "move", "manipulated_object"]],
+        ]],
+    }
+    assert validate_framewise_graph_document(value, [4], task, config) == [{
+        "frame_index": 4,
+        "state_edges": [{"subject": "robot", "relation": "holding", "object": "manipulated_object"}],
+        "actions": [{"actor": "robot", "action": "move", "object": "manipulated_object"}],
+    }]
 
 
 def test_context_chunks_never_exceed_thirty_images() -> None:
@@ -417,6 +436,16 @@ def test_graph_mask_boundary_preserves_interior_pixels() -> None:
     assert not boundary[0, 0]
 
 
+def test_distance_transform_places_marker_inside_mask() -> None:
+    mask = np.zeros((30, 40), dtype=bool)
+    mask[5:25, 10:30] = True
+    x, y, radius = mask_label_placement(mask)
+    assert mask[y, x]
+    assert 18 <= x <= 21
+    assert 13 <= y <= 16
+    assert radius >= 9
+
+
 def test_light_graph_overlay_keeps_interior_visible_and_boundary_strong() -> None:
     pixels = np.full((9, 9, 3), 100, dtype=np.uint8)
     mask = np.zeros((9, 9), dtype=bool)
@@ -474,9 +503,9 @@ def test_render_has_prompt_legend_and_strong_mask_boundary(tmp_path: Path) -> No
     output = tmp_path / "scene"
     (output / "frames").mkdir(parents=True)
     (output / "masks" / "manipulated_object").mkdir(parents=True)
-    Image.new("RGB", (80, 60), (120, 120, 120)).save(output / "frames" / "frame_000000.png")
-    mask = np.zeros((60, 80), dtype=np.uint8)
-    mask[20:40, 25:50] = 255
+    Image.new("RGB", (120, 80), (120, 120, 120)).save(output / "frames" / "frame_000000.png")
+    mask = np.zeros((80, 120), dtype=np.uint8)
+    mask[20:60, 30:90] = 255
     Image.fromarray(mask).save(output / "masks" / "manipulated_object" / "frame_000000.png")
     task = {
         "planning_goal": "move the blue cube",
@@ -488,13 +517,30 @@ def test_render_has_prompt_legend_and_strong_mask_boundary(tmp_path: Path) -> No
     graph = {"frames": [{"state_edges": [], "actions": []}]}
     rendered = _draw_frame(
         output, 0, task, graph,
-        {"min_width": 80, "mask_alpha": 0.48, "boundary_width": 2},
+        {
+            "min_width": 120,
+            "mask_alpha": 0.0,
+            "boundary_width": 2,
+            "show_mask_boundary": False,
+            "show_grounding_boxes": False,
+        },
     )
-    assert rendered.width == 80
-    assert rendered.height > 60
+    assert rendered.width == 120
+    assert rendered.height > 80
     pixels = np.asarray(rendered)
-    header_height = 10 + 15 * 2
-    assert tuple(pixels[header_height + 20, 25]) == ROLE_COLORS["manipulated_object"]
+    header_height = 10 + 20 * 2
+    assert tuple(pixels[header_height + 20, 30]) == (120, 120, 120)
+    assert tuple(pixels[header_height + 25, 35]) == (120, 120, 120)
+
+
+def test_experiment_config_overrides_are_reproducible() -> None:
+    root = Path(__file__).resolve().parents[1]
+    whole = _config(str(root / "configs" / "verifier_whole_video.json"))
+    per_frame = _config(str(root / "configs" / "verifier_per_frame.json"))
+    assert whole["qwen"]["graph_mode"] == "whole_video_frame_verifier"
+    assert per_frame["qwen"]["graph_mode"] == "per_frame_verifier"
+    assert whole["sam3"] == per_frame["sam3"]
+    assert whole["render"]["contact_sheet_columns"] == 2
 
 
 def test_robot_tracking_experiment_is_strictly_segmentation_only() -> None:

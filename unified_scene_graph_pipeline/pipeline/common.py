@@ -88,6 +88,19 @@ def mask_geometry(mask_path: Path) -> dict[str, Any]:
     }
 
 
+def mask_label_placement(mask: Any) -> tuple[int, int, float]:
+    """Place a marker deep inside a mask and return its local clearance radius."""
+    import cv2
+    import numpy as np
+
+    pixels = np.asarray(mask, dtype=np.uint8)
+    if pixels.ndim != 2 or not pixels.any():
+        raise ValueError("Marker placement requires a non-empty 2D mask")
+    distance = cv2.distanceTransform(pixels, cv2.DIST_L2, 5)
+    y, x = np.unravel_index(int(distance.argmax()), distance.shape)
+    return int(x), int(y), float(distance[y, x])
+
+
 def ensure_no_confidence(value: Any, location: str = "root") -> None:
     if isinstance(value, dict):
         for key, item in value.items():

@@ -9,7 +9,10 @@ from typing import Any
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-from common import complete_stage, image_paths, read_json, stage_current, stage_fingerprint, update_run_report
+from common import (
+    complete_stage, image_paths, mask_label_placement, read_json, stage_current,
+    stage_fingerprint, update_run_report,
+)
 
 
 ROLE_COLORS = {
@@ -165,6 +168,8 @@ def _draw_frame(
     tracks_by_entity = tracks_by_entity or {}
     mask_alpha = float(render_config.get("mask_alpha", 0.48))
     boundary_width = int(render_config.get("boundary_width", 2))
+    show_mask_boundary = bool(render_config.get("show_mask_boundary", True))
+    show_grounding_boxes = bool(render_config.get("show_grounding_boxes", True))
     min_width = int(render_config.get("min_width", 640))
     image = Image.open(output / "frames" / f"frame_{index:06d}.png").convert("RGB")
     pixels = np.asarray(image).copy()
@@ -189,7 +194,7 @@ def _draw_frame(
             if grounding and int(grounding["frame_index"]) == index
             else None
         )
-        if active_box is not None:
+        if show_grounding_boxes and active_box is not None:
             x_min, y_min, x_max, y_max = active_box
             grounding_boxes.append((
                 round(x_min * image.width / 1000),
@@ -203,11 +208,13 @@ def _draw_frame(
             continue
         visible_entities.add(entity["entity_id"])
         color = np.asarray(color_tuple)
-        pixels[mask] = ((1.0 - mask_alpha) * pixels[mask] + mask_alpha * color).astype(np.uint8)
-        pixels[_mask_boundary(mask, boundary_width)] = color
-        ys, xs = np.nonzero(mask)
+        if mask_alpha > 0:
+            pixels[mask] = ((1.0 - mask_alpha) * pixels[mask] + mask_alpha * color).astype(np.uint8)
+        if show_mask_boundary:
+            pixels[_mask_boundary(mask, boundary_width)] = color
+        x, y, radius = mask_label_placement(mask)
         labels.append((
-            int(xs.min()), int(ys.min()), ROLE_MARKERS.get(entity["role"], "?"), color_tuple,
+            x, y, radius, ROLE_MARKERS.get(entity["role"], "?"), color_tuple,
         ))
     rendered = Image.fromarray(pixels)
     scale = max(1.0, min_width / rendered.width)
@@ -216,7 +223,10 @@ def _draw_frame(
             (round(rendered.width * scale), round(rendered.height * scale)),
             Image.Resampling.LANCZOS,
         )
-        labels = [(round(x * scale), round(y * scale), label, color) for x, y, label, color in labels]
+        labels = [
+            (round(x * scale), round(y * scale), radius * scale, label, color)
+            for x, y, radius, label, color in labels
+        ]
         grounding_boxes = [
             (round(x_min * scale), round(y_min * scale), round(x_max * scale), round(y_max * scale), color)
             for x_min, y_min, x_max, y_max, color in grounding_boxes
@@ -224,7 +234,6 @@ def _draw_frame(
 
     header_font = _load_font(14)
     header_bold_font = _load_font(14, bold=True)
-    marker_font = _load_font(15, bold=True)
     line_height = 20
     header_lines = [f"Goal: {task.get('planning_goal', '')}"]
     for entity in task["entities"]:
@@ -283,9 +292,16 @@ def _draw_frame(
             color = ROLE_COLORS.get(entity["role"], (210, 210, 210))
         selected_font = header_bold_font if line_index == 0 else header_font
         draw.text((8, y), _fit_text(line, draw, selected_font, canvas_width - 16), fill=color, font=selected_font)
-    for x, y, label, color in labels:
-        x = min(x, canvas_width - 16)
-        y = min(y + header_height, header_height + rendered.height - line_height)
+    for x, y, radius, label, color in labels:
+        marker_font = _load_font(max(12, min(40, round(radius * 1.6))), bold=True)
+        size_box = draw.textbbox((0, 0), label, font=marker_font)
+        label_width = size_box[2] - size_box[0]
+        label_height = size_box[3] - size_box[1]
+        x = max(0, min(x - label_width // 2, canvas_width - label_width - 4))
+        y = max(header_height, min(
+            y + header_height - label_height // 2,
+            header_height + rendered.height - label_height - 4,
+        ))
         box = draw.textbbox((x, y), label, font=marker_font)
         draw.rectangle((box[0] - 2, box[1] - 1, box[2] + 2, box[3] + 1), fill=(0, 0, 0), outline=color, width=1)
         draw.text((x, y), label, fill=color, font=marker_font)
@@ -373,12 +389,13 @@ def render(output: Path, config: dict[str, Any], overwrite: bool = False) -> dic
         video_temporary = output / ".visualization.mp4.tmp"
         shutil.copy2(temporary_video, video_temporary)
         video_temporary.replace(video)
-        count = min(12, len(rendered_frames))
+        render_config = config.get("render", {})
+        count = min(int(render_config.get("contact_sheet_frames", 6)), len(rendered_frames))
         chosen = sorted(set(np.linspace(0, len(rendered_frames) - 1, count, dtype=int).tolist()))
         thumbs = [Image.open(rendered_frames[index]).convert("RGB") for index in chosen]
-        thumb_width = 360
+        thumb_width = int(render_config.get("contact_sheet_thumb_width", 720))
         resized = [item.resize((thumb_width, round(item.height * thumb_width / item.width)), Image.Resampling.LANCZOS) for item in thumbs]
-        columns = min(4, len(resized))
+        columns = min(int(render_config.get("contact_sheet_columns", 2)), len(resized))
         rows = (len(resized) + columns - 1) // columns
         cell_height = max(item.height for item in resized)
         contact = Image.new("RGB", (columns * thumb_width, rows * cell_height), "white")

@@ -1,0 +1,22 @@
+{
+  "schema_version": "unified_sgg_config_override_v1",
+  "extends": "../config.json",
+  "override": {
+    "qwen": {
+      "graph_mode": "whole_video_frame_verifier",
+      "graph_prompt_version": "event_draft_whole_video_frame_verifier_v1",
+      "graph_overlay_mode": "markers_only",
+      "max_tokens_graph_verifier": 7000
+    },
+    "render": {
+      "version": "outline_dynamic_marker_small_grid_v1",
+      "mask_alpha": 0.0,
+      "boundary_width": 3,
+      "show_mask_boundary": false,
+      "show_grounding_boxes": false,
+      "contact_sheet_frames": 6,
+      "contact_sheet_columns": 2,
+      "contact_sheet_thumb_width": 720
+    }
+  }
+}

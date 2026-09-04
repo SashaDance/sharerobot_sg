@@ -14,7 +14,22 @@ def _path(value: str | None) -> Path | None:
 
 
 def _config(path: str) -> dict[str, Any]:
-    value = read_json(Path(path))
+    config_path = Path(path)
+    value = read_json(config_path)
+    if value.get("schema_version") == "unified_sgg_config_override_v1":
+        base_path = (config_path.parent / value["extends"]).resolve()
+        base = read_json(base_path)
+
+        def merge(target: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+            result = dict(target)
+            for key, item in override.items():
+                if isinstance(item, dict) and isinstance(result.get(key), dict):
+                    result[key] = merge(result[key], item)
+                else:
+                    result[key] = item
+            return result
+
+        value = merge(base, value.get("override", {}))
     if value.get("schema_version") != "unified_sgg_config_v1":
         raise ValueError("Unknown configuration schema")
     return value
