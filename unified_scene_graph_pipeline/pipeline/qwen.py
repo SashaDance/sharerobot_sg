@@ -724,9 +724,10 @@ def overlay_frame(
         box = draw.textbbox((0, 0), marker, font=font)
         width, height = box[2] - box[0], box[3] - box[1]
         origin = (max(0, x - width // 2), max(0, y - height // 2))
-        box = draw.textbbox(origin, marker, font=font)
-        draw.rectangle((box[0] - 2, box[1] - 2, box[2] + 2, box[3] + 2), fill=(0, 0, 0))
-        draw.text(origin, marker, fill=color, font=font)
+        draw.text(
+            origin, marker, fill=color, font=font,
+            stroke_width=max(1, font_size // 10), stroke_fill=(0, 0, 0),
+        )
     stream = BytesIO()
     rendered.save(stream, format="JPEG", quality=88)
     return stream.getvalue()

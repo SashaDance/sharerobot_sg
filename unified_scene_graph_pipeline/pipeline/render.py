@@ -293,7 +293,8 @@ def _draw_frame(
         selected_font = header_bold_font if line_index == 0 else header_font
         draw.text((8, y), _fit_text(line, draw, selected_font, canvas_width - 16), fill=color, font=selected_font)
     for x, y, radius, label, color in labels:
-        marker_font = _load_font(max(12, min(40, round(radius * 1.6))), bold=True)
+        font_size = max(12, min(40, round(radius * 1.6)))
+        marker_font = _load_font(font_size, bold=True)
         size_box = draw.textbbox((0, 0), label, font=marker_font)
         label_width = size_box[2] - size_box[0]
         label_height = size_box[3] - size_box[1]
@@ -302,9 +303,10 @@ def _draw_frame(
             y + header_height - label_height // 2,
             header_height + rendered.height - label_height - 4,
         ))
-        box = draw.textbbox((x, y), label, font=marker_font)
-        draw.rectangle((box[0] - 2, box[1] - 1, box[2] + 2, box[3] + 1), fill=(0, 0, 0), outline=color, width=1)
-        draw.text((x, y), label, fill=color, font=marker_font)
+        draw.text(
+            (x, y), label, fill=color, font=marker_font,
+            stroke_width=max(1, font_size // 10), stroke_fill=(0, 0, 0),
+        )
     graph_y = header_height + rendered.height
     draw.rectangle((0, graph_y, canvas_width, canvas_height), fill=(9, 13, 19))
     draw.line((0, graph_y, canvas_width, graph_y), fill=(105, 115, 130), width=2)
