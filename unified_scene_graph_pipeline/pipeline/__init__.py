@@ -1,1 +1,1 @@
-"""Minimal unified scene-graph pipeline."""
+"""Goal-guided all-frame robot-video segmentation pipeline."""

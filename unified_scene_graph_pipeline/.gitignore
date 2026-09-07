@@ -4,4 +4,8 @@ __pycache__/
 .pytest_cache/
 runs/
 models/
-
+manifests/*.json
+!manifests/example.json
+third_party/depth_anything_3/
+third_party/interrvos/
+third_party/robotseg/

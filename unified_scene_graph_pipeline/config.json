@@ -9,7 +9,6 @@
     "max_tokens_entities": 1800,
     "max_tokens_entity_reflection": 1800,
     "max_tokens_tracking": 7000,
-    "max_tokens_graph": 4000,
     "retries": 2,
     "temperature": 0.0,
     "entity_prompt_version": "unified_goal_roles_v9",
@@ -19,10 +18,7 @@
     "box_anchor_count_per_window": 6,
     "entity_reflection_enabled": true,
     "entity_reflection_prompt_version": "refer_agent_style_all_frame_reflection_v1",
-    "tracking_prompt_version": "unified_sparse_six_anchor_bbox_tracker_v1",
-    "graph_mode": "verified_event_timeline",
-    "graph_prompt_version": "verified_persistent_event_timeline_v1",
-    "graph_overlay_mode": "filled_with_markers"
+    "tracking_prompt_version": "unified_sparse_six_anchor_bbox_tracker_v1"
   },
   "sam3": {
     "checkpoint": "/models/sam3.pt",
@@ -58,25 +54,5 @@
       "sam3": "9999e2341ceef5e136daa386eecb55cb414446a00ac2b55eb2dfd2f7c3cf8c9e",
       "sam2": "2647878d5dfa5098f2f8649825738a9345572bae2d4350a2468587ece47dd318"
     }
-  },
-  "da3": {
-    "model_name": "DA3NESTED-GIANT-LARGE-1.1",
-    "source_revision": "3d835ec1a5802d64a8b8b15f817a1ab54809bfe4",
-    "chunk_size": 30,
-    "process_resolution": 504,
-    "checkpoint_sha256": "8ebe871a022ed58d2fc8fdfb2ebdb31d57b60fe39611c849095851a7b7c6020c"
-  },
-  "render": {
-    "version": "sparse_six_anchor_hybrid_v9",
-    "grounding_label": "SAM3 text + six Qwen box anchors per 30-frame window; SAM2 gap repair",
-    "min_width": 640,
-    "mask_alpha": 0.48,
-    "boundary_width": 2
-  },
-  "ontology": {
-    "roles": ["robot", "manipulated_object", "initial_support", "target", "whole_parent"],
-    "required_roles": ["robot", "manipulated_object"],
-    "states": ["on", "inside", "holding", "touching", "part_of", "attached_to", "open", "closed"],
-    "actions": ["reach_for", "grab", "lift", "move", "place", "release", "push", "pour", "open", "close", "insert", "stack"]
   }
 }

@@ -35,7 +35,6 @@ def run_batch(
     config: dict[str, Any],
     overwrite: bool = False,
     fail_fast: bool = False,
-    require_da3: bool = True,
 ) -> dict[str, Any]:
     results = []
     shared_sam_model = None
@@ -54,18 +53,6 @@ def run_batch(
             elif stage == "sam":
                 from sam_stage import segment
                 result = segment(output, config, overwrite, shared_sam_model)
-            elif stage == "graph":
-                from qwen import infer_graph
-                result = infer_graph(output, config, overwrite)
-            elif stage == "trajectory":
-                from trajectory import compute_trajectory
-                result = compute_trajectory(output, config, overwrite)
-            elif stage == "render":
-                from render import render
-                result = render(output, config, overwrite)
-            elif stage == "validate":
-                from validate import validate
-                result = validate(output, require_da3)
             else:
                 raise ValueError(f"Unsupported batch stage: {stage}")
             results.append({"relative_path": str(output.relative_to(output_root)), "status": "success"})
@@ -76,7 +63,7 @@ def run_batch(
             if fail_fast:
                 raise
     summary = {
-        "schema_version": "unified_sgg_batch_report_v1",
+        "schema_version": "goal_guided_segmentation_batch_report_v1",
         "stage": stage,
         "completed_at": utc_now(),
         "scene_count": len(results),

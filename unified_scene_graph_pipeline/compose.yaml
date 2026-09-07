@@ -1,4 +1,4 @@
-name: ${COMPOSE_PROJECT_NAME:-unified-sgg}
+name: ${COMPOSE_PROJECT_NAME:-goal-guided-segmentation}
 
 services:
   qwen:
@@ -24,8 +24,7 @@ services:
     environment:
       HF_TOKEN: ${HF_TOKEN:-}
     volumes:
-      - ${MODEL_ROOT:-/datasets/unified_scene_graph_models}:/models:ro
-      - ./manifests:/manifests:ro
+      - ${MODEL_ROOT:-/datasets/goal_guided_segmentation_models}:/models:ro
     ipc: host
     shm_size: 32gb
     deploy:
@@ -33,16 +32,14 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["${QWEN_GPU_ID:-1}"]
+              device_ids: ["${QWEN_GPU_ID:-0}"]
               capabilities: [gpu]
 
   qwen-proxy:
     image: python:3.12-alpine
     command: ["python", "/proxy/auth_proxy.py"]
     environment:
-      INFERENCE_API_KEY: ${INFERENCE_API_KEY:?set INFERENCE_API_KEY in the mode-600 runtime env file}
-      # A trailing dot avoids Kubernetes-style host search domains on servers
-      # whose host resolv.conf is inherited by Docker's embedded DNS.
+      INFERENCE_API_KEY: ${INFERENCE_API_KEY:?set INFERENCE_API_KEY in the runtime env file}
       UPSTREAM_HOST: qwen.
       UPSTREAM_PORT: "8000"
     volumes:
@@ -55,16 +52,16 @@ services:
 
   core:
     profiles: [tools]
-    image: unified-sgg-core:1.0.0
+    image: goal-guided-segmentation:1.0.0
     build:
       context: .
       dockerfile: docker/core.Dockerfile
     environment:
-      INFERENCE_API_KEY: ${INFERENCE_API_KEY:?set INFERENCE_API_KEY in the mode-600 runtime env file}
+      INFERENCE_API_KEY: ${INFERENCE_API_KEY:?set INFERENCE_API_KEY in the runtime env file}
     volumes:
       - ${DATASET_ROOT:-/datasets}:/datasets:ro
-      - ${RUN_ROOT:-/datasets/unified_scene_graph_runs}:/runs
-      - ${MODEL_ROOT:-/datasets/unified_scene_graph_models}:/models:ro
+      - ${RUN_ROOT:-/datasets/segmentation_runs}:/runs
+      - ${MODEL_ROOT:-/datasets/goal_guided_segmentation_models}:/models:ro
       - ./manifests:/manifests:ro
     ipc: host
     shm_size: 32gb
@@ -73,66 +70,5 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["${CORE_GPU_ID:-1}"]
-              capabilities: [gpu]
-
-  robotseg:
-    profiles: [tools]
-    image: unified-sgg-robotseg:1.0.0
-    build:
-      context: .
-      dockerfile: docker/robotseg.Dockerfile
-    volumes:
-      - ${DATASET_ROOT:-/datasets}:/datasets:ro
-      - ${RUN_ROOT:-/datasets/unified_scene_graph_runs}:/runs
-      - ${MODEL_ROOT:-/datasets/unified_scene_graph_models}:/models:ro
-      - ./manifests:/manifests:ro
-    ipc: host
-    shm_size: 32gb
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ["${CORE_GPU_ID:-1}"]
-              capabilities: [gpu]
-
-  reviosa:
-    profiles: [tools]
-    image: woojeongjin/interrvos@sha256:6405558c773b1bdb3251dd6db65bbc975147e6533e9ab447782caac28c9eb8ac
-    entrypoint: ["python", "/pipeline/reviosa_tracking_compare.py"]
-    volumes:
-      - ${DATASET_ROOT:-/datasets}:/datasets:ro
-      - ${RUN_ROOT:-/datasets/unified_scene_graph_runs}:/runs
-      - ${MODEL_ROOT:-/datasets/unified_scene_graph_models}:/models:ro
-      - ./pipeline/reviosa_tracking_compare.py:/pipeline/reviosa_tracking_compare.py:ro
-      - ./reviosa_tracking_config.json:/pipeline/reviosa_tracking_config.json:ro
-      - ./manifests:/manifests:ro
-    ipc: host
-    shm_size: 32gb
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ["${CORE_GPU_ID:-1}"]
-              capabilities: [gpu]
-
-  da3:
-    profiles: [tools]
-    image: unified-sgg-da3:1.0.0
-    build:
-      context: .
-      dockerfile: docker/da3.Dockerfile
-    volumes:
-      - ${RUN_ROOT:-/datasets/unified_scene_graph_runs}:/runs
-      - ${MODEL_ROOT:-/datasets/unified_scene_graph_models}:/models:ro
-    ipc: host
-    shm_size: 32gb
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ["${DA3_GPU_ID:-1}"]
+              device_ids: ["${CORE_GPU_ID:-0}"]
               capabilities: [gpu]
