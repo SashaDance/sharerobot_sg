@@ -31,6 +31,13 @@ MASK_MARKERS = {
 }
 
 
+def _normalize_frame_integer(value: Any) -> Any:
+    """Normalize JSON integer strings without accepting fractional frame values."""
+    if isinstance(value, str) and re.fullmatch(r"-?\d+", value):
+        return int(value)
+    return value
+
+
 def contextual_chunks(indices: list[int], maximum_images: int):
     if maximum_images < 2:
         raise ValueError("Qwen frame limit must be at least 2")
@@ -982,6 +989,8 @@ def validate_event_graph_document(
                 f"[start_frame,end_frame,actor,action,object_or_null]; got {event}"
             )
         start, end, actor, action, obj = event
+        start = _normalize_frame_integer(start)
+        end = _normalize_frame_integer(end)
         if (
             not isinstance(start, int) or isinstance(start, bool)
             or not isinstance(end, int) or isinstance(end, bool)
@@ -1001,6 +1010,7 @@ def validate_event_graph_document(
         if not isinstance(transition, list) or len(transition) != 3:
             raise ValueError(f"Invalid transition {transition}")
         frame_index, removed, added = transition
+        frame_index = _normalize_frame_integer(frame_index)
         if (
             not isinstance(frame_index, int) or isinstance(frame_index, bool)
             or not (first_frame < frame_index <= last_frame) or frame_index in seen_frames

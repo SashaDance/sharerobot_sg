@@ -372,6 +372,34 @@ def test_event_graph_replays_persistent_state_and_action_intervals() -> None:
     assert [item["actions"][0]["action"] for item in actions] == ["move", "move", "place"]
 
 
+def test_event_graph_normalizes_numeric_string_frame_indices() -> None:
+    task = {
+        "entities": [
+            {"entity_id": "robot"},
+            {"entity_id": "manipulated_object"},
+            {"entity_id": "target"},
+        ],
+    }
+    config = {"ontology": {"states": ["holding", "on"], "actions": ["move", "place"]}}
+    document = {
+        "initial_state": [["robot", "holding", "manipulated_object"]],
+        "events": [
+            ["3", "4", "robot", "move", "manipulated_object"],
+            ["5", "5", "robot", "place", "manipulated_object"],
+        ],
+        "transitions": [
+            ["5", [["robot", "holding", "manipulated_object"]], [["manipulated_object", "on", "target"]]],
+        ],
+        "final_state": [["manipulated_object", "on", "target"]],
+    }
+
+    verified = validate_event_graph_document(document, [3, 4, 5], task, config)
+
+    assert verified["events"][0][:2] == [3, 4]
+    assert verified["events"][1][:2] == [5, 5]
+    assert verified["transitions"][0][0] == 5
+
+
 def test_qwen_schema_retry_includes_invalid_response(monkeypatch) -> None:
     class Response:
         ok = True
