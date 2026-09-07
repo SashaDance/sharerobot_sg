@@ -18,6 +18,9 @@ The current configuration uses the same procedure for every video:
 3. `sam` runs SAM3 video text segmentation with the entity prompt and canonical
    name. Sparse Qwen anchors select the intended SAM3 track. SAM2.1 propagates
    from the same anchors and fills frames where the selected SAM3 track is absent.
+4. `visualize` overlays the final masks and strong role-colored boundaries on
+   every frame, adds the canonical names, actual SAM prompts, and frame statuses,
+   and creates an MP4 plus a compact contact sheet.
 
 The Qwen boxes are grounding cues rather than final masks. There are no
 confidence fields in the public outputs.
@@ -85,6 +88,7 @@ export SEGMENTATION_ENV=/datasets/goal_guided_segmentation.runtime.env
 ./run.sh stop-qwen
 
 ./run.sh sam --output /runs/example
+./run.sh visualize --output /runs/example
 ```
 
 For an image sequence, replace `--video` with `--images`. Filenames must contain
@@ -125,6 +129,11 @@ stages deliberately remain separate so Qwen can be stopped before SAM starts:
   --manifest /manifests/run.json \
   --source-root /datasets/source \
   --output-root /runs/run
+
+./run.sh batch --stage visualize \
+  --manifest /manifests/run.json \
+  --source-root /datasets/source \
+  --output-root /runs/run
 ```
 
 Pass `--fail-fast` to stop a batch at its first failed scene. Without it, the
@@ -141,13 +150,19 @@ task_spec.json
 qwen_entities_audit.json
 tracks.json
 masks/<entity_id>/frame_000000.png ...
+visualization.mp4
+contact_sheet.jpg
 run_report.json
 .stages/*.json
 ```
 
 Masks are single-channel PNGs with the same dimensions and frame correspondence
 as the prepared RGB sequence. A missing entity or failed frame is represented by
-an empty mask and an explicit status in `tracks.json`.
+an empty mask and an explicit status in `tracks.json`. The visualization uses
+transparent role-colored fills, clear boundaries, dynamic in-mask role letters,
+and a per-frame legend containing the canonical names and SAM prompts. Qwen
+grounding boxes are hidden by default and can be enabled with
+`visualize.show_grounding_boxes` in `config.json`.
 
 Stages are atomic and resumable. A stage is skipped only when its configuration
 and upstream-artifact fingerprint matches the stored marker. Use `--overwrite`
@@ -161,8 +176,9 @@ occlusion, tiny manipulated objects, and ambiguous planning goals remain common
 failure modes. The saved Qwen audit is intended for diagnosing these cases; it
 contains prompts and model responses but no API key.
 
-This branch provides segmentation only. It does not generate relations, actions,
-depth, trajectories, evaluation metrics, or visual-review dashboards.
+This branch provides segmentation and mask visualization only. It does not
+generate relations, actions, depth, trajectories, evaluation metrics, or review
+dashboards.
 
 ## Tests
 
@@ -171,7 +187,8 @@ pytest -q tests
 ```
 
 The tests cover frame preservation, schemas, sparse anchors, Qwen retries,
-candidate prompts, and SAM3/SAM2 mask selection without requiring model weights.
+candidate prompts, SAM3/SAM2 mask selection, and visualization artifacts without
+requiring model weights.
 
 ## Third-party licensing
 

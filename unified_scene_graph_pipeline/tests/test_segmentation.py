@@ -29,20 +29,22 @@ from sam_stage import (  # noqa: E402
     _qwen_box_chunks,
     _select_hybrid_masks,
 )
+from visualize import ROLE_COLORS, draw_frame, visualize  # noqa: E402
 
 
 def test_public_cli_contains_only_segmentation_stages() -> None:
     choices = parser()._subparsers._group_actions[0].choices
-    assert set(choices) == {"prepare", "entities", "sam", "batch"}
+    assert set(choices) == {"prepare", "entities", "sam", "visualize", "batch"}
     batch_actions = choices["batch"]._actions
     stage = next(action for action in batch_actions if action.dest == "stage")
-    assert set(stage.choices) == {"prepare", "entities", "sam"}
+    assert set(stage.choices) == {"prepare", "entities", "sam", "visualize"}
 
 
 def test_release_configuration_loads() -> None:
     config = _config(str(Path(__file__).resolve().parents[1] / "config.json"))
     assert config["segmenter"]["backend"] == "sam3_sam2"
     assert config["qwen"]["box_anchor_count_per_window"] == 6
+    assert config["visualize"]["boundary_width"] == 3
     assert "da3" not in config and "render" not in config and "ontology" not in config
 
 
@@ -252,3 +254,78 @@ def test_qwen_retry_supplies_invalid_response_to_repair_prompt(monkeypatch) -> N
     assert len(attempts) == 2
     assert payloads[1]["messages"][1]["content"] == '{"value":0}'
     assert "value must be one" in payloads[1]["messages"][2]["content"]
+
+
+def test_visualization_renders_masks_prompts_video_and_contact_sheet(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    output = tmp_path / "scene"
+    (output / "frames").mkdir(parents=True)
+    (output / "masks" / "manipulated_object").mkdir(parents=True)
+    for frame_index in range(3):
+        Image.new("RGB", (64, 48), (100, 100, 100)).save(
+            output / "frames" / f"frame_{frame_index:06d}.png"
+        )
+        mask = np.zeros((48, 64), dtype=np.uint8)
+        mask[8:32, 10 + frame_index:34 + frame_index] = 255
+        Image.fromarray(mask).save(
+            output / "masks" / "manipulated_object" / f"frame_{frame_index:06d}.png"
+        )
+    (output / "input.json").write_text(json.dumps({
+        "frame_count": 3,
+        "width": 64,
+        "height": 48,
+        "planning_goal": "move the red cube",
+    }))
+    task = {
+        "planning_goal": "move the red cube",
+        "entities": [{
+            "entity_id": "manipulated_object",
+            "role": "manipulated_object",
+            "canonical_name": "small red cube",
+            "sam_prompt": "red cube",
+        }],
+    }
+    tracks = {
+        "frame_count": 3,
+        "tracks": [{
+            "entity_id": "manipulated_object",
+            "role": "manipulated_object",
+            "frames": [
+                {"frame_index": index, "status": "visible", "area": 576}
+                for index in range(3)
+            ],
+        }],
+    }
+    (output / "task_spec.json").write_text(json.dumps(task))
+    (output / "tracks.json").write_text(json.dumps(tracks))
+    config = {
+        "schema_version": "unified_sgg_config_v1",
+        "visualize": {
+            "fps": 6,
+            "min_width": 64,
+            "mask_alpha": 0.45,
+            "boundary_width": 2,
+            "show_grounding_boxes": False,
+            "contact_sheet_frames": 3,
+            "contact_sheet_columns": 2,
+            "contact_sheet_thumb_width": 64,
+        },
+    }
+
+    rendered = draw_frame(output, 0, task, tracks, config)
+    assert rendered.height > 48
+    header_height = 10 + 21 * 2
+    assert rendered.getpixel((10, header_height + 8)) == ROLE_COLORS["manipulated_object"]
+
+    def fake_ffmpeg(command, check):
+        assert check is True
+        assert command[0] == "ffmpeg"
+        Path(command[-1]).write_bytes(b"test-video")
+
+    monkeypatch.setattr("visualize.subprocess.run", fake_ffmpeg)
+    result = visualize(output, config)
+    assert result["status"] == "success"
+    assert (output / "visualization.mp4").read_bytes() == b"test-video"
+    assert Image.open(output / "contact_sheet.jpg").size[0] == 128
+    assert visualize(output, config)["status"] == "skipped_current"

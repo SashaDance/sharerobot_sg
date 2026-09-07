@@ -47,13 +47,16 @@ def parser() -> argparse.ArgumentParser:
     goal.add_argument("--planning-goal-json")
     goal.add_argument("--planning-goal")
     prepare.add_argument("--overwrite", action="store_true")
-    for name in ("entities", "sam"):
+    for name in ("entities", "sam", "visualize"):
         item = commands.add_parser(name)
         item.add_argument("--output", required=True)
         item.add_argument("--config", default="/pipeline/config.json")
         item.add_argument("--overwrite", action="store_true")
     batch = commands.add_parser("batch")
-    batch.add_argument("--stage", required=True, choices=("prepare", "entities", "sam"))
+    batch.add_argument(
+        "--stage", required=True,
+        choices=("prepare", "entities", "sam", "visualize"),
+    )
     batch.add_argument("--manifest", required=True)
     batch.add_argument("--source-root", required=True)
     batch.add_argument("--output-root", required=True)
@@ -75,6 +78,9 @@ def main() -> int:
     elif args.command == "sam":
         from sam_stage import segment
         result = segment(output, _config(args.config), args.overwrite)
+    elif args.command == "visualize":
+        from visualize import visualize
+        result = visualize(output, _config(args.config), args.overwrite)
     elif args.command == "batch":
         from batch import run_batch
         result = run_batch(

@@ -54,5 +54,15 @@
       "sam3": "9999e2341ceef5e136daa386eecb55cb414446a00ac2b55eb2dfd2f7c3cf8c9e",
       "sam2": "2647878d5dfa5098f2f8649825738a9345572bae2d4350a2468587ece47dd318"
     }
+  },
+  "visualize": {
+    "fps": 6,
+    "min_width": 640,
+    "mask_alpha": 0.45,
+    "boundary_width": 3,
+    "show_grounding_boxes": false,
+    "contact_sheet_frames": 6,
+    "contact_sheet_columns": 2,
+    "contact_sheet_thumb_width": 640
   }
 }

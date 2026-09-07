@@ -3,7 +3,8 @@
 The reusable Docker pipeline is in
 [`unified_scene_graph_pipeline/`](unified_scene_graph_pipeline/). It segments
 task-relevant entities in a robot-manipulation video using only ordered RGB
-frames and a natural-language planning goal.
+frames and a natural-language planning goal, and renders mask-overlay videos and
+contact sheets for review.
 
 This branch intentionally excludes scene-graph evaluation experiments, reports,
 manifests, generated outputs, depth reconstruction, and one-off server launch

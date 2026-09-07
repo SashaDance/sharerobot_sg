@@ -91,14 +91,14 @@ case "${1:-}" in
     fi
     mv "${MODEL_ROOT}/.sam2.1_hiera_large.pt.tmp" "$target"
     ;;
-  prepare|entities|sam|batch)
+  prepare|entities|sam|visualize|batch)
     require_env
     command="$1"
     shift
     core "$command" "$@"
     ;;
   *)
-    echo "Usage: $0 {build|download-qwen|download-sam2|start-qwen|wait-qwen|stop-qwen|prepare|entities|sam|batch}" >&2
+    echo "Usage: $0 {build|download-qwen|download-sam2|start-qwen|wait-qwen|stop-qwen|prepare|entities|sam|visualize|batch}" >&2
     exit 2
     ;;
 esac

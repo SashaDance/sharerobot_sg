@@ -53,6 +53,9 @@ def run_batch(
             elif stage == "sam":
                 from sam_stage import segment
                 result = segment(output, config, overwrite, shared_sam_model)
+            elif stage == "visualize":
+                from visualize import visualize
+                result = visualize(output, config, overwrite)
             else:
                 raise ValueError(f"Unsupported batch stage: {stage}")
             results.append({"relative_path": str(output.relative_to(output_root)), "status": "success"})
