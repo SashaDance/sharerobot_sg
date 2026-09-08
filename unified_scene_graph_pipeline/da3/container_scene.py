@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import gc
 import hashlib
 import json
 import os
@@ -14,6 +15,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -104,38 +106,76 @@ def update_report(scene: Path, status: str, details: dict) -> None:
     write_json(path, report)
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--scene", required=True)
-    parser.add_argument("--config", default="/pipeline/da3/config.yaml")
-    parser.add_argument("--overwrite", action="store_true")
-    args = parser.parse_args()
-    scene = Path(args.scene).resolve()
+class NativeRunner:
+    """Own one DA3 model and reuse it for every scene in this process."""
+
+    def __init__(self, config_path: Path) -> None:
+        streaming_root = Path("/opt/da3/da3_streaming")
+        sys.path.insert(0, str(streaming_root))
+        from da3_streaming import (  # type: ignore[import-not-found]
+            DA3_Streaming,
+            load_config,
+            load_da3_model,
+            merge_ply_files,
+            warmup_numba,
+        )
+
+        self._streaming_class = DA3_Streaming
+        self._load_model = load_da3_model
+        self._merge_ply_files = merge_ply_files
+        self._config = load_config(str(config_path))
+        self._model = None
+        if self._config["Model"]["align_lib"] == "numba":
+            warmup_numba()
+
+    def run(self, image_dir: Path, output_dir: Path) -> None:
+        import torch
+
+        if self._model is None:
+            self._model = self._load_model(self._config)
+        worker = self._streaming_class(
+            str(image_dir), str(output_dir), self._config, model=self._model
+        )
+        try:
+            worker.run()
+            worker.close()
+            print("Saving all the point clouds")
+            self._merge_ply_files(
+                str(output_dir / "pcd"), str(output_dir / "pcd" / "combined_pcd.ply")
+            )
+            print("DA3-Streaming done.")
+        finally:
+            del worker
+            torch.cuda.empty_cache()
+            gc.collect()
+
+
+def process_scene(
+    scene: Path, config_path: Path, overwrite: bool, runner: NativeRunner
+) -> dict[str, Any]:
+    scene = scene.resolve()
     frames = natural_frames(scene / "frames")
     if not frames:
-        raise SystemExit("No prepared frames")
+        raise ValueError(f"No prepared frames: {scene}")
     final = scene / "da3"
     backups = sorted(scene.glob(".da3.backup.*"))
     if not final.exists() and backups:
         backups[-1].replace(final)
-    config_path = Path(args.config)
     stage_fingerprint = fingerprint(frames, config_path)
     marker = scene / ".stages" / "da3.json"
-    if final.exists() and marker.is_file() and not args.overwrite:
+    if final.exists() and marker.is_file() and not overwrite:
         marker_value = json.loads(marker.read_text())
         if marker_value.get("fingerprint") == stage_fingerprint:
             details = validate(final, len(frames))
-            print("DA3_RESULT=" + json.dumps({"status": "skipped_valid", **details}, sort_keys=True))
-            return 0
+            result = {"status": "skipped_valid", **details}
+            print("DA3_RESULT=" + json.dumps(result, sort_keys=True))
+            return result
     # Every Docker invocation starts this process as PID 1. A PID-based name
     # therefore collides with a partial directory left by an interrupted run.
     temporary = Path(tempfile.mkdtemp(prefix=".da3.tmp.", dir=scene))
     started = time.monotonic()
     try:
-        subprocess.run([
-            sys.executable, "/opt/da3/da3_streaming/da3_streaming.py",
-            "--image_dir", str(scene / "frames"), "--config", args.config, "--output_dir", str(temporary),
-        ], check=True)
+        runner.run(scene / "frames", temporary)
         shutil.copy2(config_path, temporary / "config.yaml")
         repair_empty_pointcloud(temporary)
         details = validate(temporary, len(frames))
@@ -148,18 +188,78 @@ def main() -> int:
             temporary.replace(final)
         result = {
             "status": "success", "runtime_seconds": round(time.monotonic() - started, 3),
-            "max_rss_kb": resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss, **details,
+            "max_rss_kb": max(
+                resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+                resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss,
+            ),
+            **details,
         }
         write_json(marker, {"stage": "da3", "fingerprint": stage_fingerprint, **result})
         update_report(scene, "success", result)
         print("DA3_RESULT=" + json.dumps(result, sort_keys=True))
-        return 0
+        return result
     except Exception:
         failed = scene / f".da3.failed.{int(time.time())}"
         if temporary.exists():
             temporary.replace(failed)
         update_report(scene, "failed", {"error": "DA3 stage failed; see container log"})
         raise
+
+
+def manifest_scenes(manifest: Path, output_root: Path) -> list[Path]:
+    value = json.loads(manifest.read_text())
+    scenes = []
+    for item in value.get("episodes", value.get("scenes", [])):
+        relative = Path(item["relative_path"])
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError(f"Unsafe relative_path in manifest: {relative}")
+        scenes.append(output_root / relative)
+    return scenes
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--scene", action="append", default=[])
+    parser.add_argument("--manifest")
+    parser.add_argument("--output-root")
+    parser.add_argument("--config", default="/pipeline/da3/config.yaml")
+    parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--fail-fast", action="store_true")
+    args = parser.parse_args()
+    scenes = [Path(value) for value in args.scene]
+    if args.manifest:
+        if not args.output_root:
+            parser.error("--output-root is required with --manifest")
+        scenes.extend(manifest_scenes(Path(args.manifest), Path(args.output_root)))
+    if not scenes:
+        parser.error("provide --scene or --manifest")
+
+    runner = NativeRunner(Path(args.config))
+    failures = []
+    completed = 0
+    skipped = 0
+    for index, scene in enumerate(scenes, start=1):
+        print(f"DA3_BEGIN index={index}/{len(scenes)} scene={scene}")
+        try:
+            result = process_scene(
+                scene, Path(args.config), args.overwrite, runner
+            )
+            skipped += result["status"] == "skipped_valid"
+            completed += result["status"] == "success"
+        except Exception as error:
+            failures.append({"scene": str(scene), "error": str(error)})
+            print("DA3_ERROR=" + json.dumps(failures[-1], sort_keys=True), file=sys.stderr)
+            if args.fail_fast:
+                raise
+    summary = {
+        "scene_count": len(scenes),
+        "success_count": completed,
+        "skipped_count": skipped,
+        "failure_count": len(failures),
+        "failures": failures,
+    }
+    print("DA3_BATCH_RESULT=" + json.dumps(summary, sort_keys=True))
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":

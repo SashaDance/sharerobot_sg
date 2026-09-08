@@ -118,7 +118,8 @@ source scene must contain `images/` and `planning_goal.json`.
 The generic runner serializes Qwen, SAM, graph generation, and DA3 so the large
 models do not have to coexist on the GPU. It stops Qwen before each non-Qwen GPU
 stage and generates a final review index. The underlying stage markers make the
-command safe to rerun after interruption.
+command safe to rerun after interruption. In batch mode, one persistent DA3
+container loads the checkpoint once and reuses the model for all pending scenes.
 
 ## Outputs
 

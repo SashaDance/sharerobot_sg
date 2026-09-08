@@ -124,13 +124,13 @@ case "${1:-}" in
     command="$1"; shift
     core "$command" "$@"
     ;;
-  da3)
+  da3|da3-batch)
     require_env
     shift
     "${COMPOSE[@]}" run --rm --no-deps -T da3 "$@"
     ;;
   *)
-    echo "Usage: $0 {build|build-core|build-da3|download-qwen|download-sam2|start-qwen|start-qwen-gpu0|start-qwen-tp2|wait-qwen|stop-qwen|prepare|entities|sam|graph|da3|trajectory|render|validate|batch|review-index} ..." >&2
+    echo "Usage: $0 {build|build-core|build-da3|download-qwen|download-sam2|start-qwen|start-qwen-gpu0|start-qwen-tp2|wait-qwen|stop-qwen|prepare|entities|sam|graph|da3|da3-batch|trajectory|render|validate|batch|review-index} ..." >&2
     exit 2
     ;;
 esac

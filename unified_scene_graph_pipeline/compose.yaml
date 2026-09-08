@@ -85,6 +85,7 @@ services:
     volumes:
       - ${RUN_ROOT:-/datasets/unified_scene_graph_runs}:/runs
       - ${MODEL_ROOT:-/datasets/unified_scene_graph_models}:/models:ro
+      - ./manifests:/manifests:ro
     ipc: host
     shm_size: 32gb
     deploy:

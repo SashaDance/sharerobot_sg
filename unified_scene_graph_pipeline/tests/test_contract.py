@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import sys
+import types
 from pathlib import Path
 
 import numpy as np
@@ -38,6 +40,12 @@ from sam_stage import (  # noqa: E402
     _select_hybrid_masks,
     _validate_candidate_selection,
 )
+
+DA3_WRAPPER_PATH = Path(__file__).resolve().parents[1] / "da3" / "container_scene.py"
+DA3_SPEC = importlib.util.spec_from_file_location("release_da3_wrapper", DA3_WRAPPER_PATH)
+assert DA3_SPEC and DA3_SPEC.loader
+DA3_WRAPPER = importlib.util.module_from_spec(DA3_SPEC)
+DA3_SPEC.loader.exec_module(DA3_WRAPPER)
 
 
 def test_role_specific_candidate_prompts_are_global_and_deduplicated() -> None:
@@ -78,6 +86,56 @@ def test_prepare_preserves_all_arbitrary_length_rgba_frames(tmp_path: Path) -> N
     assert result["frame_count"] == 7
     assert [path.name for path in image_paths(output / "frames")] == [f"frame_{index:06d}.png" for index in range(7)]
     assert all(Image.open(path).mode == "RGB" for path in image_paths(output / "frames"))
+
+
+def test_da3_manifest_paths_are_rooted_and_reject_traversal(tmp_path: Path) -> None:
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps({"episodes": [{"relative_path": "source/episode_1"}]}))
+    assert DA3_WRAPPER.manifest_scenes(manifest, Path("/runs/output")) == [
+        Path("/runs/output/source/episode_1")
+    ]
+    manifest.write_text(json.dumps({"episodes": [{"relative_path": "../outside"}]}))
+    try:
+        DA3_WRAPPER.manifest_scenes(manifest, Path("/runs/output"))
+        raise AssertionError("manifest traversal accepted")
+    except ValueError:
+        pass
+
+
+def test_da3_native_runner_loads_model_once_for_multiple_scenes(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    loaded_models = []
+    received_models = []
+
+    class FakeStreaming:
+        def __init__(self, _images, _output, _config, model=None):
+            received_models.append(model)
+
+        def run(self):
+            pass
+
+        def close(self):
+            pass
+
+    fake_model = object()
+    fake_da3 = types.SimpleNamespace(
+        DA3_Streaming=FakeStreaming,
+        load_config=lambda _path: {"Model": {"align_lib": "torch"}},
+        load_da3_model=lambda _config: loaded_models.append(fake_model) or fake_model,
+        merge_ply_files=lambda _source, _target: None,
+        warmup_numba=lambda: None,
+    )
+    fake_torch = types.SimpleNamespace(cuda=types.SimpleNamespace(empty_cache=lambda: None))
+    monkeypatch.setitem(sys.modules, "da3_streaming", fake_da3)
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+
+    runner = DA3_WRAPPER.NativeRunner(tmp_path / "config.yaml")
+    runner.run(tmp_path / "frames_a", tmp_path / "output_a")
+    runner.run(tmp_path / "frames_b", tmp_path / "output_b")
+
+    assert loaded_models == [fake_model]
+    assert received_models == [fake_model, fake_model]
 
 
 def test_entity_schema_rejects_extra_roles_and_confidence() -> None:

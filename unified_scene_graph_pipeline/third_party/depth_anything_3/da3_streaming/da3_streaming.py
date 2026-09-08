@@ -129,8 +129,21 @@ def remove_duplicates(data_list):
     return result
 
 
+def load_da3_model(config):
+    """Load the DA3 network once so callers can reuse it across scenes."""
+    print("Loading model...")
+    with open(config["Weights"]["DA3_CONFIG"]) as f:
+        model_config = json.load(f)
+    model = DepthAnything3(**model_config)
+    weight = load_file(config["Weights"]["DA3"])
+    model.load_state_dict(weight, strict=False)
+    model.eval()
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    return model.to(device)
+
+
 class DA3_Streaming:
-    def __init__(self, image_dir, save_dir, config):
+    def __init__(self, image_dir, save_dir, config, model=None):
         self.config = config
 
         self.chunk_size = self.config["Model"]["chunk_size"]
@@ -163,16 +176,7 @@ class DA3_Streaming:
 
         self.delete_temp_files = self.config["Model"]["delete_temp_files"]
 
-        print("Loading model...")
-
-        with open(self.config["Weights"]["DA3_CONFIG"]) as f:
-            config = json.load(f)
-        self.model = DepthAnything3(**config)
-        weight = load_file(self.config["Weights"]["DA3"])
-        self.model.load_state_dict(weight, strict=False)
-
-        self.model.eval()
-        self.model = self.model.to(self.device)
+        self.model = model if model is not None else load_da3_model(self.config)
 
         self.skyseg_session = None
 

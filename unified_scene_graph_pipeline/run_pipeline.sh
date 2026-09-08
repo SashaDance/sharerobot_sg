@@ -40,18 +40,9 @@ fi
 batch graph
 "$RUN" stop-qwen
 
-# Keep the manifest stream on fd 3.  docker compose run remains attached to
-# stdin even with -T and otherwise consumes the remaining scene paths after
-# the first DA3 invocation.
-while IFS= read -r -u 3 relative_path; do
-  "$RUN" da3 --scene "$OUTPUT_ROOT/$relative_path"
-done 3< <(python3 - "$MANIFEST_HOST" <<'PY'
-import json, sys
-value = json.load(open(sys.argv[1]))
-for item in value.get("episodes", value.get("scenes", [])):
-    print(item["relative_path"])
-PY
-)
+# One container and one Python process own the full DA3 batch. The model is
+# loaded once and reused while per-scene outputs remain atomic and resumable.
+"$RUN" da3-batch --manifest "/manifests/$MANIFEST_NAME" --output-root "$OUTPUT_ROOT"
 
 batch trajectory
 batch render
