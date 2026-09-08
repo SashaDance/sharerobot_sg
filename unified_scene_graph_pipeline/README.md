@@ -1,101 +1,158 @@
-# Minimal Unified Scene-Graph Pipeline
+# Unified Scene-Graph Pipeline
 
-This directory is a self-contained, Docker-only pipeline for reference image sequences and generated MP4 videos. Its only semantic inputs are an ordered RGB sequence and a planning goal. It processes every frame and deliberately has no code path for ShareRobot planning steps, source masks, keyframes, aliases, confidence fields, or per-episode fixes.
+This is the reproducible Docker implementation of the goal-guided robot-video
+scene-graph pipeline. Its only semantic inputs are a natural-language planning
+goal and either an ordered RGB sequence or an MP4. It processes every frame and
+does not consume ShareRobot planning steps, source masks, keyframes, confidence
+fields, or episode-specific corrections.
 
-## Stages
+## Pipeline
 
-1. `prepare` normalizes every source frame to ordered RGB PNG without sampling.
-2. `entities` asks the pinned local Qwen3.8-27B server for the five-role task specification, then tracks those fixed identities over all frames in deterministic five-frame box-or-null chunks.
-3. `sam` runs both the detector-oriented text prompt and canonical visual name through native SAM3 video inference. The Qwen tracks select SAM3 candidates per frame by overlap and normalized center distance; coarse Qwen boxes never delete a candidate by themselves. Masks and explicit status are written for every entity/frame.
-4. `graph` asks Qwen to infer every frame from RGB, mask overlays, the goal, and role definitions.
-5. `da3` reconstructs every frame with the vendored/patched DA3 streaming implementation.
-6. `trajectory` robustly back-projects the manipulated-object mask through native DA3 depth, intrinsics, and camera-to-world poses.
-7. `render` creates `visualization.mp4` and `contact_sheet.jpg`.
-8. `validate` enforces the all-frame contract and public JSON invariants.
+The same stages are used for reference and generated videos:
 
-Each stage writes its final marker last. Stage fingerprints include the configuration and upstream artifacts, so a changed configuration or dependency reruns that stage and naturally invalidates downstream fingerprints. Directory-producing GPU stages build temporary output and swap it into place only after validation.
+1. `prepare` converts every input frame to numerically ordered RGB PNG files.
+2. `entities` uses Qwen3.8-27B to identify the robot, manipulated object,
+   initial support, target, and optional whole parent. It obtains six uniformly
+   spaced box-or-null grounding anchors per 30-frame window and performs an
+   all-frame entity-reflection pass.
+3. `sam` runs native SAM3 video text segmentation. Sparse Qwen boxes select the
+   intended SAM3 track, and SAM2.1 fills frames where that track is absent.
+4. `graph` uses Qwen over the complete video to produce one state/action graph
+   per frame and verify the temporal event sequence.
+5. `da3` reconstructs every frame with the pinned Depth Anything 3 streaming
+   implementation, saving depth, intrinsics, poses, and point clouds.
+6. `trajectory` back-projects the manipulated-object masks through the DA3
+   geometry to form its 3D trajectory.
+7. `render` writes a review video and contact sheet with entity labels and
+   readable graph edges.
+8. `validate` enforces the all-frame artifact and JSON-schema contracts.
 
-## Pinned software and models
+Stages write their marker last and use fingerprints of their inputs and
+configuration. Rerunning the pipeline skips valid work and resumes at the first
+missing or invalid stage. GPU directory outputs are built in temporary paths and
+installed only after validation.
 
-`VERSIONS.json` records upstream revisions. Upstream licenses remain in each `third_party` tree. SAM3 and DA3 checkpoints are mounted read-only from `/datasets/unified_scene_graph_models`; Qwen is downloaded at the exact recorded Hugging Face revision using the pinned vLLM container. No checkpoint or secret is copied into an image.
+## Requirements
 
-The server runtime file defaults to `/datasets/unified_scene_graph_pipeline.runtime.env`. It must be mode `600` and contain `INFERENCE_API_KEY`, `HF_TOKEN`, and the three storage roots. `runtime.env.example` documents the fields and is safe to commit. A non-logging bearer-auth proxy protects the local endpoint; the vLLM process never receives the key as a command-line argument and is not published on a host port.
+- Linux, Docker Engine, Docker Compose v2, NVIDIA Container Toolkit, and `curl`.
+- One CUDA GPU with enough memory for the 55.6 GB BF16 Qwen model. Qwen,
+  segmentation, and DA3 run sequentially.
+- A Hugging Face token with access to `Qwen/Qwen3.8-27B`.
+- `sam3.pt`, obtained under the upstream model terms.
 
-## Server use
+Pinned repository/model revisions are recorded in `VERSIONS.json`; upstream
+licenses are retained under `third_party/`. Checkpoints and secrets are never
+copied into images or committed to Git.
+
+## Setup
+
+Create a server-only environment file outside the repository:
 
 ```bash
+cp runtime.env.example /datasets/unified_scene_graph_pipeline.runtime.env
 chmod 600 /datasets/unified_scene_graph_pipeline.runtime.env
+```
+
+Fill in `INFERENCE_API_KEY`, `HF_TOKEN`, and the storage roots. The inference key
+is a private bearer token protecting the local Qwen endpoint, not a paid API
+credential. GPU assignments can be configured with `QWEN_GPU_ID`,
+`CORE_GPU_ID`, and `DA3_GPU_ID`; all default to physical GPU 1.
+
+Build the images and download the pinned models:
+
+```bash
+export UNIFIED_SGG_ENV=/datasets/unified_scene_graph_pipeline.runtime.env
 ./run.sh build
 ./run.sh download-qwen
-./run_experiment.sh manifests/pilot_10.json \
-  /datasets/sharerobot_planning_selected /runs/pilot_v1
+./run.sh download-sam2
 ```
 
-The experiment runner deliberately serializes GPU work on physical GPU 1: Qwen entity pass → stop Qwen → SAM3 → Qwen graph pass → stop Qwen → DA3. The normal Compose device reservation exposes only GPU 1. If single-GPU Qwen exits during startup, the runner may use the TP=2 override only after verifying that GPU 0 has at least 40 GB free; GPU 0 is otherwise untouched.
+Place SAM3 at `${MODEL_ROOT}/sam3.pt` and DA3 at
+`${MODEL_ROOT}/da3/model.safetensors` with its configuration at
+`${MODEL_ROOT}/da3/config.json`. Expected immutable revisions and checkpoint
+hashes are listed in `VERSIONS.json` and the runtime configuration.
 
-For one generated MP4, use the identical stage commands, changing only `prepare`:
+## Run one video
+
+Paths passed to the commands are container paths. `${DATASET_ROOT}` is mounted
+read-only at `/datasets`; `${RUN_ROOT}` is mounted read-write at `/runs`.
 
 ```bash
-./run.sh prepare --output /runs/generated_smoke --video /datasets/input.mp4 \
-  --planning-goal "place the object in the container"
+export UNIFIED_SGG_ENV=/datasets/unified_scene_graph_pipeline.runtime.env
+
+./run.sh prepare --output /runs/example \
+  --video /datasets/input/example.mp4 \
+  --planning-goal "place the red block in the metal bowl"
+
+./run.sh start-qwen
+./run.sh wait-qwen
+./run.sh entities --output /runs/example
+./run.sh stop-qwen
+
+./run.sh sam --output /runs/example
+
+./run.sh start-qwen
+./run.sh wait-qwen
+./run.sh graph --output /runs/example
+./run.sh stop-qwen
+
+./run.sh da3 --scene /runs/example
+./run.sh trajectory --output /runs/example
+./run.sh render --output /runs/example
+./run.sh validate --output /runs/example
 ```
 
-Then run `entities`, `sam`, `graph`, `da3 --scene`, `trajectory`, `render`, and `validate` on that output. No frame-count option is required.
+For ordered images, replace `--video` with `--images`. A goal JSON can be passed
+with `--planning-goal-json`; it must contain a `planning_goal` string.
 
-## Cohorts and stopping rule
+## Batch mode
 
-- `manifests/pilot_10.json` is the active fixed one-per-dataset pilot. FMB is excluded.
-- `manifests/pilot_11.json` is retained only to reproduce historical experiments that included FMB.
-- `manifests/validation_100.json` is sampled from `/datasets/sharerobot_planning_manipulation_selected`, the active 1,000-scene manipulation dataset.
-- `select_validation.py` deterministically selects 100 scenes with all 11 datasets, all observed image resolutions, and forced task-family coverage. It uses only manifest goals and PNG headers.
-- `review-index` writes JSON and HTML review indexes with the agreed failure taxonomy and visual checklist.
+Copy `manifests/example.json` and list source-relative scene directories. Every
+source scene must contain `images/` and `planning_goal.json`.
 
-The scripts do not contain a full-1,000 run command. The 100-scene validation must be reviewed and summarized before any broader run is launched.
+```bash
+./run_pipeline.sh manifests/example.json \
+  /datasets/source_dataset /runs/my_scene_graph_run
+```
 
-## Current pilot result
+The generic runner serializes Qwen, SAM, graph generation, and DA3 so the large
+models do not have to coexist on the GPU. It stops Qwen before each non-Qwen GPU
+stage and generates a final review index. The underlying stage markers make the
+command safe to rerun after interruption.
 
-The sparse six-anchor configuration at source commit `bdd96152` completed
-technical validation for all 10 active pilot scenes. Manual semantic outcome:
-**7 fully successful, 1 partially successful, and 2 unsuccessful**. It matches
-the dense `6a92f266` visual outcome while reducing audited Qwen box-request
-attempts from 138 to 20 and cumulative box-request time from 2381.2 to 420.7
-seconds. See `experiments/bdd9615203ace96bdeece23a5aa173653e38db82/` for the
-per-scene report and archived visualizations. The 100-scene validation has not
-been launched.
+## Outputs
 
-## Public output tree
+Each scene contains:
 
-Each scene contains `input.json`, `frames/`, `task_spec.json`, `masks/`, `tracks.json`, `scene_graph.json`, `da3/`, `trajectory_3d.json`, `visualization.mp4`, `contact_sheet.jpg`, `validation_report.json`, and `run_report.json`. Qwen request/response audits are kept separately for reproducibility and contain no API key.
+```text
+input.json
+frames/
+task_spec.json
+masks/
+tracks.json
+scene_graph.json
+da3/
+trajectory_3d.json
+visualization.mp4
+contact_sheet.jpg
+validation_report.json
+run_report.json
+```
 
-## Whole-robot tracking comparison
+`scene_graph.json` contains one record per input frame. State predicates are
+`on`, `inside`, `holding`, `touching`, `part_of`, `attached_to`, `open`, and
+`closed`. Actions are `reach_for`, `grab`, `lift`, `move`, `place`, `release`,
+`push`, `pour`, `open`, `close`, `insert`, and `stack`.
 
-`run_robot_tracking_experiment.sh` is a segmentation-only comparison between the official RobotSeg automatic video mode (`category="robot"`) and SAM3 native video propagation from the single text prompt `robot`. It processes every frame in `manifests/pilot_10.json` and deliberately skips Qwen, all non-robot entities, relations, actions, DA3, and trajectories.
+DA3 normally saves its native confidence-filtered point cloud. For a
+low-confidence clip where native downsampling would produce zero vertices, the
+wrapper regenerates the cloud from the already validated native depth,
+intrinsics, and poses while retaining every point that passes DA3's confidence
+rule. The use of this global fallback is recorded in the DA3 stage metadata.
 
-The run writes per-method masks and diagnostics, plus a three-panel `visualization.mp4` and `contact_sheet.png` for every scene. The diagnostics describe temporal mask behavior without ground-truth robot masks; they are not segmentation-accuracy metrics.
+## Release scope
 
-## Agent-style no-box experiment
-
-`run_experiment_dual_gpu.sh` implements a training-free AgentRVOS-inspired
-variant without Qwen frame boxes. One all-frame Qwen call extracts a specific
-core concept and a broader noun concept for each role. SAM3 runs both concepts
-over every frame, keeps the concept producing more native instance tracks, and
-renders every candidate with a stable ID, colored mask, and boundary. Qwen then
-classifies the complete candidate tracks and selects one role-consistent track
-from the all-frame overlays. SAM2 is not used in this variant.
-
-The script keeps Qwen resident on physical GPU 0 while SAM3 and DA3 use physical
-GPU 1. This removes the second Qwen model load and permits SAM3 on GPU 1 to call
-the track-level Qwen selector on GPU 0. The implementation follows AgentRVOS's
-candidate-first principle, but it is an adaptation because the authors have not
-released their inference code.
-
-## Sparse-box experiment
-
-`run_experiment_gpu1.sh` is the strict GPU-1-only runner. Qwen is loaded once
-for all entity/grounding work and once for all graph work; it is never restarted
-per scene and it has no TP=2 fallback. The sparse grounding configuration asks
-for six uniformly spaced Qwen box-or-null anchors per 30-frame window, before
-and after entity reflection. Non-anchor frames are represented explicitly with
-null boxes. SAM3 still propagates text tracks over every frame, the sparse boxes
-select the intended native instance, and SAM2 uses the six anchors in one
-30-frame temporal window only to fill frames missing from SAM3.
+This branch contains only the production segmentation, scene-graph, DA3,
+trajectory, visualization, and validation paths. Historical experiment outputs,
+dataset curation scripts, RobotSeg, InterRVOS, and server-specific launch scripts
+are deliberately excluded.

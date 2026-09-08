@@ -43,11 +43,42 @@ def validate(output: Path, expected: int) -> dict:
         path = output / name
         if not path.is_file() or path.stat().st_size < 200:
             raise RuntimeError(f"{name}: missing or empty")
-    return {"npz_count": len(npzs), "pose_count": len(pose_lines)}
+    return {
+        "npz_count": len(npzs),
+        "pose_count": len(pose_lines),
+        "pointcloud_fallback": (output / "pcd" / "fallback.json").is_file(),
+    }
+
+
+def repair_empty_pointcloud(output: Path) -> bool:
+    """Regenerate a degenerate native point cloud from valid DA3 frame outputs."""
+    combined = output / "pcd" / "combined_pcd.ply"
+    if combined.is_file() and combined.stat().st_size >= 200:
+        return False
+    subprocess.run([
+        sys.executable,
+        "/opt/da3/da3_streaming/npz_output_process.py",
+        "--npz_folder", str(output / "results_output"),
+        "--pose_file", str(output / "camera_poses.txt"),
+        "--output_file", str(combined),
+        "--conf_threshold_coef", "0.75",
+        # Very low-confidence clips may contain too few valid points for the
+        # native sampling ratio. Retain all valid points instead of rounding
+        # the requested sample count to zero.
+        "--sample_ratio", "1.0",
+    ], check=True)
+    if not combined.is_file() or combined.stat().st_size < 200:
+        raise RuntimeError("point-cloud fallback produced no valid vertices")
+    shutil.copy2(combined, output / "pcd" / "0_pcd.ply")
+    write_json(output / "pcd" / "fallback.json", {
+        "reason": "native confidence-filtered point cloud was empty",
+        "method": "DA3 npz_output_process with full valid-point retention",
+    })
+    return True
 
 
 def fingerprint(frames: list[Path], config: Path) -> str:
-    digest = hashlib.sha256(b"da3_stage_v1")
+    digest = hashlib.sha256(b"da3_stage_v2_empty_pointcloud_fallback")
     for path in [config, *frames]:
         digest.update(path.name.encode())
         with path.open("rb") as stream:
@@ -104,6 +135,7 @@ def main() -> int:
             "--image_dir", str(scene / "frames"), "--config", args.config, "--output_dir", str(temporary),
         ], check=True)
         shutil.copy2(config_path, temporary / "config.yaml")
+        repair_empty_pointcloud(temporary)
         details = validate(temporary, len(frames))
         if final.exists():
             backup = scene / f".da3.backup.{int(time.time())}"

@@ -22,7 +22,5 @@ RUN python -c "from sam3.model_builder import build_sam3_video_model; from sam2.
 
 COPY pipeline /pipeline
 COPY config.json /pipeline/config.json
-COPY configs /pipeline/configs
-COPY robot_tracking_config.json /pipeline/robot_tracking_config.json
 WORKDIR /workspace
 ENTRYPOINT ["python", "/pipeline/cli.py"]

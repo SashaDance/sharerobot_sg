@@ -1,23 +1,15 @@
-# Unified Scene-Graph Pipeline
+# Goal-Guided Robot Video Scene Graphs
 
-The active implementation is [`unified_scene_graph_pipeline/`](unified_scene_graph_pipeline/).
-It uses only ordered RGB frames and a planning goal, and it runs the same all-frame
-pipeline for reference episodes and generated videos.
+The reusable Docker pipeline is in
+[`unified_scene_graph_pipeline/`](unified_scene_graph_pipeline/). Given ordered
+RGB frames or an MP4 and a natural-language planning goal, it produces
+task-relevant entity tracks and masks, frame-level state/action graphs, DA3
+geometry, a manipulated-object 3D trajectory, and review visualizations.
 
-Historical implementations and the earlier evaluation/dashboard code are preserved
-unchanged under [`legacy_code/`](legacy_code/). Data, papers, reports, checkpoints,
-secrets, run outputs, and experiment artifacts are intentionally not part of source
-control.
+This release branch intentionally excludes historical experiment artifacts,
+dataset-selection utilities, one-off server launch scripts, and unrelated
+tracking baselines. Model checkpoints, datasets, secrets, and generated outputs
+are not stored in Git.
 
-Each pipeline experiment is identified by the full source commit hash and stored under
-`experiments/<commit-hash>/`. Every experiment contains the same eleven pilot
-visualizations and a concise manual visual assessment.
-
-Every experiment conclusion must include this exact summary near the top:
-`Outcome count: N fully successful, M partially successful, and K unsuccessful.`
-The three values must sum to the reviewed scene count. “Fully successful” means
-the task-critical entities, masks, state change, and actions are semantically
-usable; “partially successful” means the task is still interpretable but at least
-one material component is missing or wrong; “unsuccessful” means the output does
-not provide a reliable task interpretation. Technical completion without crashes
-is reported separately and does not determine this semantic outcome count.
+See the pipeline README for setup, single-video use, batch execution, output
+schemas, and pinned third-party revisions.

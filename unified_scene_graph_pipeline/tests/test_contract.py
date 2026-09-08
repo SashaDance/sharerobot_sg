@@ -12,7 +12,6 @@ PIPELINE = Path(__file__).resolve().parents[1] / "pipeline"
 sys.path.insert(0, str(PIPELINE))
 
 from common import ensure_no_confidence, image_paths, mask_label_placement  # noqa: E402
-from cli import _config  # noqa: E402
 from prepare import prepare  # noqa: E402
 from qwen import (  # noqa: E402
     QwenClient,
@@ -31,7 +30,6 @@ from qwen import (  # noqa: E402
     validate_tracking_document,
 )
 from render import ROLE_COLORS, _draw_frame  # noqa: E402
-from robot_tracking_compare import _config as robot_tracking_config, _diagnostics  # noqa: E402
 from sam_stage import (  # noqa: E402
     _candidate_overlay,
     _candidate_text_prompts,
@@ -559,41 +557,3 @@ def test_render_has_prompt_legend_and_strong_mask_boundary(tmp_path: Path) -> No
     header_height = 10 + 20 * 2
     assert tuple(pixels[header_height + 20, 30]) == (120, 120, 120)
     assert tuple(pixels[header_height + 25, 35]) == (120, 120, 120)
-
-
-def test_experiment_config_overrides_are_reproducible() -> None:
-    root = Path(__file__).resolve().parents[1]
-    whole = _config(str(root / "configs" / "verifier_whole_video.json"))
-    per_frame = _config(str(root / "configs" / "verifier_per_frame.json"))
-    assert whole["qwen"]["graph_mode"] == "whole_video_frame_verifier"
-    assert per_frame["qwen"]["graph_mode"] == "per_frame_verifier"
-    assert whole["sam3"] == per_frame["sam3"]
-    assert whole["render"]["contact_sheet_columns"] == 2
-
-
-def test_robot_tracking_experiment_is_strictly_segmentation_only() -> None:
-    config_path = Path(__file__).resolve().parents[1] / "robot_tracking_config.json"
-    config = robot_tracking_config(config_path)
-    assert config["scope"] == {
-        "entity": "whole_robot",
-        "prompt_frame_index": 0,
-        "process_every_frame": True,
-        "shared_staging": "numeric JPEG, quality 100, chroma subsampling disabled",
-        "generate_other_entities": False,
-        "generate_scene_graph": False,
-        "generate_depth_or_trajectory": False,
-    }
-    assert config["sam3"]["text_prompt"] == "robot"
-    assert config["robotseg"]["category"] == "robot"
-
-
-def test_robot_tracking_diagnostics_do_not_claim_accuracy() -> None:
-    masks = []
-    for offset in (0, 1, 2):
-        mask = np.zeros((20, 30), dtype=bool)
-        mask[5:15, 8 + offset:18 + offset] = True
-        masks.append(mask)
-    result = _diagnostics(masks)
-    assert result["visible_frame_count"] == 3
-    assert result["median_consecutive_mask_iou"] > 0.8
-    assert "not accuracy metrics" in result["note"]

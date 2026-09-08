@@ -1,8 +1,15 @@
+.git
 .env
+.env.*
+*.pt
+*.pth
+*.ckpt
 __pycache__/
 *.pyc
 .pytest_cache/
-runs/
+manifests/
 models/
+runs/
+tests/
 third_party/interrvos/
 third_party/robotseg/

@@ -8,18 +8,6 @@
     "repository": "https://github.com/facebookresearch/sam2.git",
     "commit": "2b90b9f5ceec907a1c18123530e92e794ad901a4"
   },
-  "robotseg": {
-    "repository": "https://github.com/showlab/RobotSeg.git",
-    "commit": "dafb8c0d507276e2f96d2b07ac3661a7b3a41a5f",
-    "checkpoint_sha256": "1384c38c4f313487a32503025d4566ac1d815f6be983199362fc4af19aaa06a2"
-  },
-  "interrvos": {
-    "repository": "https://github.com/cvlab-kaist/InterRVOS.git",
-    "commit": "25fb94bcf1159d4839607c8f829af7a55dfc335e",
-    "model_repository": "wooj0216/ReVIOSa-4B",
-    "model_revision": "c8c66b578376dd5e8c70e5ddd6d4990e18dc9f5f",
-    "serving_image": "woojeongjin/interrvos@sha256:6405558c773b1bdb3251dd6db65bbc975147e6533e9ab447782caac28c9eb8ac"
-  },
   "depth_anything_3": {
     "repository": "https://github.com/ByteDance-Seed/Depth-Anything-3.git",
     "commit": "3d835ec1a5802d64a8b8b15f817a1ab54809bfe4",
@@ -27,7 +15,8 @@
       "explicit_process_resolution",
       "single_chunk_artifact_materialization",
       "single_chunk_full_frame_save_with_streaming_overlap",
-      "numeric_frame_sorting"
+      "numeric_frame_sorting",
+      "empty_pointcloud_full_valid_point_fallback"
     ]
   },
   "qwen": {
