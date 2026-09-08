@@ -11,6 +11,7 @@ import resource
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -126,8 +127,9 @@ def main() -> int:
             details = validate(final, len(frames))
             print("DA3_RESULT=" + json.dumps({"status": "skipped_valid", **details}, sort_keys=True))
             return 0
-    temporary = scene / f".da3.tmp.{os.getpid()}"
-    temporary.mkdir()
+    # Every Docker invocation starts this process as PID 1. A PID-based name
+    # therefore collides with a partial directory left by an interrupted run.
+    temporary = Path(tempfile.mkdtemp(prefix=".da3.tmp.", dir=scene))
     started = time.monotonic()
     try:
         subprocess.run([
